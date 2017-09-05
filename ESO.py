@@ -1,6 +1,7 @@
 from os.path import isfile, join, expanduser
 from astroquery.eso import Eso
 import logging
+import secretstorage
 
 cacheDir = expanduser(r'~\.astropy\cache\astroquery\Eso')
 
@@ -10,10 +11,7 @@ user = 'awehrhahn'
 
 def login(user):
     eso = Eso()
-    succesful = False
-    while not succesful:
-        succesful = eso.login(user, store_password=True)
-    # input pw
+    eso.login(user, store_password=True)
     return eso
 
 

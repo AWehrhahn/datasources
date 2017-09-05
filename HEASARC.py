@@ -23,11 +23,11 @@ import pandas as pd
 class heasarc(object):
     """Representation of heasarc query"""
 
-    def __init__(self, table, position, radius=30, resolver="SIMBAD", time="", max_results=100,
+    def __init__(self, table, query, radius=30, resolver="SIMBAD", time="", max_results=100,
                  fields="Standard", order_by="", params="", coordsys='equatorial', equinox="2000", gifsize=0, host='heasarc', convert_fields=True, print_offset=False, timeout=30):
         socket.setdefaulttimeout(timeout)
         self.table = str(table)
-        self.position = str(position)
+        self.query = str(query)
         self.radius = radius
         self.resolver = str(resolver)
         self.time = time
@@ -65,9 +65,12 @@ class heasarc(object):
                     "Radius": self.radius,
                     "NR": self.resolver,
                     "fields": self.fields,
-                    "Position": self.position,
                     "ResultMax": self.max_results,
                     "Time": ""}
+
+        field,val = query.split('==')
+        querydic[field] = val
+        
         #"Format":"VOTable"}       # VOTable does not currently work, as the connection fails
         querydic['tablehead'] = "name%3dBATCHRETRIEVALCATALOG%5f2%2e0 " + \
             str(self.table)
@@ -101,7 +104,14 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
 
 
 def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='./DATA/HEARSEC', UseCache=True):
+    """
+    dataset examples: 
+        - Position == eps_Eri
+        - TRANSIT == 1
+    """
     logging.info('Loading HEARSEC data')
+    if isinstance(dataset, str):
+        dataset = (dataset, )
 
     cache = Cache.Cache(folder, dataset, catalogue, fields)
     data = cache.load() if UseCache else None
@@ -116,13 +126,11 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
         obsids = heasarc(catalogue, source, fields=fields)
         text = obsids.text
         lines = text.split('\n')
-        content = lines[0] + '\n' + lines[1]
-        # if not empty
-        if not lines[1] == "":
-            df_temp = pd.read_table(io.StringIO(content), delimiter='|', usecols=[
-                                    i for i in range(len(fields))])
-            print(df_temp.head())
-            df.iloc[i] = df_temp.iloc[0]
+        endline = lines.index('')
+        lines = lines[:endline]
+        temp = ('{}\n' * len(lines))
+        lines = str.format(temp,*lines)
+        df = pd.read_table(io.StringIO(lines), delimiter='|', usecols=[i for i in range(len(fields))])
 
     df = df.applymap(lambda s: s.decode('utf-8')
                      if isinstance(s, bytes) else s)
