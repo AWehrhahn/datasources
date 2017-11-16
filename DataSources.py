@@ -6,26 +6,4 @@
 # avoid using the subclasses directly
 """
 
-from typing import List
-from DataSources import idlToPandas,SIMBAD,FITS,ESO,HEASARC
-
-DataFrame = List[List]
-
-def fromIDL(filename: str, key: str=None, folder: str = './DATA/IDL/', UseCache: bool = True) -> DataFrame:
-    return idlToPandas.idlToPandas(filename, key, folder, UseCache)
-
-
-def fromSIMBAD(stars: List[str], fields: List[str], format: str='Pandas', folder: str='./DATA/SIMBAD/', UseCache: bool=True) -> DataFrame:
-    return SIMBAD.getFromSimbad(stars, fields, format, folder, UseCache)
-
-
-def fromFITS(filenames: List[str], folder: str='', extractTo: str='./', headerOnly: bool=False) -> List:
-    return FITS.getFITS(filenames, folder, extractTo, headerOnly)
-
-
-def fromESO(dataset: List[str], folder: str='./DATA/ESO/') -> List[str]:
-    return ESO.fromArchive(dataset, folder)
-
-
-def fromHEASARC(dataset: List[str], folder: str='./DATA/HEARSEC/', UseCache: bool = True) -> List[str]:
-    return HEASARC.getData(dataset, folder=folder, UseCache=UseCache)
+from DataSources import Cache

@@ -22,6 +22,7 @@ def getNotes(starID):
 def VOTableFromSimbad(stars, fields):
     """ Load VOTable from SIMBAD """
     custom = Simbad()
+    fields = list(fields)
     if len(fields) > 0:
         if 'main_id' in fields:
             fields.remove('main_id')
@@ -48,6 +49,20 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
     return txt
 
 
+def Query_ID(name, cache_folder='./DATA/SIMBAD/', UseCache=True):
+    """ query ids only """
+    cache = Cache.Cache(cache_folder, name, 'id_query')
+    data = cache.load() if UseCache else None
+
+    if data is not None:
+        return data
+    data = Simbad.query_objectids(name)
+    if UseCache:
+        cache.save(data)
+
+    return data
+
+
 def getFromSimbad(stars, fields, table_format='pandas', cache_folder='./DATA/SIMBAD/', UseCache=True):
     """
     Manages the data retrieval and file cashe
@@ -66,7 +81,8 @@ def getFromSimbad(stars, fields, table_format='pandas', cache_folder='./DATA/SIM
         # if not get data online
         logging.info('Retrieving SIMBAD data online')
         df = DataFrameFromSimbad(stars, fields)
-        cache.save(df)
+        if UseCache:
+            cache.save(df)
 
     # return desired Format
     table_format = table_format.lower()

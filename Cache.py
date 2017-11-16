@@ -22,7 +22,7 @@ class Cache:
             with open(self.filename,'rb') as f:
                 return pickle.load(f)
             #return pd.read_pickle(self.filename)
-        return None
+        raise IOError('File not found')
 
     def save(self,data):
         if not os.path.isdir(self.folder):
