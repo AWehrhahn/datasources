@@ -18,10 +18,11 @@ class Cache:
 
     def load(self):
         if os.path.isfile(self.filename):
-            logging.info('Cached File found: %s' %  self.filename)
+            logging.info('Cached file found: %s' %  self.filename)
             with open(self.filename,'rb') as f:
                 return pickle.load(f)
             #return pd.read_pickle(self.filename)
+        logging.info('No cached file found')
         raise IOError('File not found')
 
     def save(self,data):

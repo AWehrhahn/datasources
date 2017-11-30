@@ -2,7 +2,9 @@
 Handle the collection of yaml files known as stellar db
 """
 import os
-from ruamel.yaml import YAML
+import numpy as np
+import pandas as pd
+from ruamel.yaml import YAML, comments
 try:
     from ruamel.yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
@@ -11,7 +13,9 @@ except ImportError:
 
 
 from Config.config import load_config
-from DataSources import SIMBAD
+#import SIMBAD
+from astroquery.simbad import Simbad
+import HEASARC
 
 
 class StellarDB:
@@ -23,6 +27,8 @@ class StellarDB:
         self.cache = config['path_cache']
         self.yaml = YAML()
         self.name_index = self.gen_name_index()
+
+        self.config = self.__load_yaml__('StellarDB_config.yaml')
 
     def __load_yaml__(self, fname):
         """ load yaml data from file with given filename """
@@ -59,7 +65,7 @@ class StellarDB:
 
     def save(self, star):
         """ save data for star with given name """
-        name = star['name'][0]
+        name = star['name'][0].replace(' ', '')
         if name not in self.name_index:
             print('WARNING: Name not found, creating new entry')
             filename = name + '.yaml'
@@ -67,6 +73,7 @@ class StellarDB:
             while os.path.exists(os.path.join(self.folder, filename)):
                 filename = name + i + '.yaml'
                 i += 1
+            filename = os.path.join(self.folder, filename)
             self.name_index[name] = filename
         else:
             filename = self.name_index[name]
@@ -80,26 +87,91 @@ class StellarDB:
 
         return star
 
-    def auto_fill(self, name, fields=('ids', 'otype', 'sptype', 'ra', 'dec', )):
-        """ retrieve data from SIMBAD and save it in file """
-        star = self.load(name)
+    def auto_fill(self, name):
+        """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
+        try:
+            star = self.load(name)
+        except AttributeError:
+            star = {'name': [name]}
         name = star['name'][0]
-        df = SIMBAD.getFromSimbad(name, fields, cache_folder=self.cache)
-        df = df.iloc[0]
 
-        if 'ids' in fields:
-            ids = SIMBAD.Query_ID(name, cache_folder=self.cache)
-            for id_star in ids:
-                if id_star[0] not in star['name']:
-                    star['name'].append(id_star[0])
+        # Load fields to read from Database
+        simbad_fields = self.config['SIMBAD_fields']
+        exoplanet_fields = self.config['exoplanet_fields']
 
-            i = fields.index('ids')
-            fields = fields[:i] + fields[i + 1:]
+        # SIMBAD Data
+        for f in simbad_fields:
+            try:
+                Simbad.add_votable_fields(f)
+            except KeyError:
+                print('No field named ', f, ' found')
+        simbad_data = Simbad.query_object(name).to_pandas()
+        simbad_data = simbad_data.applymap(lambda s: s.decode('utf-8') if isinstance(s, bytes) else s)
+        simbad_data['MAIN_ID'] = simbad_data['MAIN_ID'].apply(lambda s: s.replace(' ', ''))
 
-        field_to_df_translation = {
-            'main_id': 'MAIN_ID', 'otype': 'OTYPE', 'sptype': 'SP_TYPE', 'ra': 'RA', 'dec': 'DEC'}
+        ids = Simbad.query_objectids(name)
+        for n in ids:
+            if n[0] not in star['name']:
+                star['name'].append(n[0])
 
-        for f in fields:
-            star[f.lower()] = df[field_to_df_translation[f]]
+        # Exoplanet Data
+        exoplanet_data = HEASARC.getData("Position==%s" % name, fields=exoplanet_fields)
+        exoplanet_data['star_name'] = exoplanet_data['star_name'].apply(lambda s: s.replace(' ', ''))
+        exoplanet_data['planet_name'] = exoplanet_data['name     ']
 
+        #This relies on the Main_ID in SIMBAD and exoplanet.org to be the same
+        merge = pd.merge(simbad_data, exoplanet_data, left_on='MAIN_ID', right_on='star_name')
+
+        # Set values according to layout        
+        layout = self.load('ids')
+
+        def to_baseclass(value):
+            """ fix type of value to a python base class """
+            if isinstance(value, (np.ndarray, np.generic)):
+                if value.dtype in [np.float32, np.float64]:
+                    return float(value)
+                if value.dtype in [np.int32, np.int64]:
+                    return int(value)
+            return str(value)
+
+        def set_values(layout, merge, star={}):
+            """ set values in merge, as described in layout """
+            for entry in layout.items():
+                if entry[0] in ['name']:
+                    continue
+                #for planets
+                if entry[0]  == 'planets':
+                    star['planets'] = {}
+                    for _, planet in merge.iterrows():
+                        name = planet['planet_name'][-1]
+                        star['planets'][name] = set_values(entry[1]['name'], merge, star={})
+                    continue
+
+                # If only one label is given use that one
+                if isinstance(entry[1], str):
+                    value = to_baseclass(merge[entry[1]][0])
+                    star[entry[0]] = value
+                
+                # If there is a list then use the first that is not Null
+                if isinstance(entry[1], list):
+                    star[entry[0]] = None
+                    for ent in entry[1]:
+                        value = to_baseclass(merge[ent][0])
+                        if value is not None and not np.isnan(value):
+                            star[entry[0]] = value
+                            break
+
+                # If it is a Commeted Map, i.e. a dictionary, go into each object and repeat
+                if isinstance(entry[1], comments.CommentedMap):
+                    star[entry[0]] = set_values(entry[1], merge, star={})
+            return star
+
+        star = set_values(layout, merge, star=star)
         self.save(star)
+
+if __name__ == '__main__':
+    target = 'GJ 1214'
+    sdb = StellarDB()
+    sdb.auto_fill('GJ 1214')
+    star = sdb.load(target)
+    print(star)

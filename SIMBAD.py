@@ -7,7 +7,7 @@ import astropy.io.votable as votable
 from astropy.table import Table
 from astroquery.simbad import Simbad
 
-from DataSources import Cache
+import Cache
 
 
 def getNotes(starID):
@@ -22,7 +22,7 @@ def getNotes(starID):
 def VOTableFromSimbad(stars, fields):
     """ Load VOTable from SIMBAD """
     custom = Simbad()
-    fields = list(fields)
+    fields = [f.lower() for f in fields]
     if len(fields) > 0:
         if 'main_id' in fields:
             fields.remove('main_id')
@@ -52,7 +52,10 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
 def Query_ID(name, cache_folder='./DATA/SIMBAD/', UseCache=True):
     """ query ids only """
     cache = Cache.Cache(cache_folder, name, 'id_query')
-    data = cache.load() if UseCache else None
+    try:
+        data = cache.load() if UseCache else None
+    except IOError:
+        data = None
 
     if data is not None:
         return data
@@ -73,7 +76,10 @@ def getFromSimbad(stars, fields, table_format='pandas', cache_folder='./DATA/SIM
         stars = (stars,)
 
     cache = Cache.Cache(cache_folder, stars, fields, format)
-    data = cache.load() if UseCache else None
+    try:
+        data = cache.load() if UseCache else None
+    except IOError:
+        data = None
 
     if data is not None:
         return data

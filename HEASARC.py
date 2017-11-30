@@ -13,7 +13,7 @@ import socket
 import re
 import logging
 import io
-from DataSources import Cache
+import Cache
 import pandas as pd
 
 # to do: sanitize input (i.e.  make switches for complicated args) 'Galactic:
@@ -23,7 +23,7 @@ import pandas as pd
 class heasarc(object):
     """Representation of heasarc query"""
 
-    def __init__(self, table, query, radius=30, resolver="SIMBAD", time="", max_results=100,
+    def __init__(self, table, query, radius=1, resolver="SIMBAD", time="", max_results=100,
                  fields="Standard", order_by="", params="", coordsys='equatorial', equinox="2000", gifsize=0, host='heasarc', convert_fields=True, print_offset=False, timeout=30):
         socket.setdefaulttimeout(timeout)
         self.table = str(table)
@@ -105,16 +105,19 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
 
 def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='./DATA/HEARSEC', UseCache=True):
     """
-    dataset examples: 
-        - Position == eps_Eri
-        - TRANSIT == 1
+    dataset examples: (no blanks!) 
+        - Position==eps_Eri
+        - TRANSIT==1
     """
     logging.info('Loading HEARSEC data')
     if isinstance(dataset, str):
         dataset = (dataset, )
 
     cache = Cache.Cache(folder, dataset, catalogue, fields)
-    data = cache.load() if UseCache else None
+    try:
+        data = cache.load() if UseCache else None
+    except IOError:
+        data = None
 
     if data is not None:
         return data
