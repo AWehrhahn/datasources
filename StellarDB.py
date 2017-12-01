@@ -2,6 +2,7 @@
 Handle the collection of yaml files known as stellar db
 """
 import os
+import inspect
 import numpy as np
 import pandas as pd
 from ruamel.yaml import YAML, comments
@@ -15,7 +16,10 @@ except ImportError:
 from Config.config import load_config
 #import SIMBAD
 from astroquery.simbad import Simbad
-import HEASARC
+try:
+    import HEASARC
+except ModuleNotFoundError:
+    from DataSources import HEASARC
 
 
 class StellarDB:
@@ -28,7 +32,9 @@ class StellarDB:
         self.yaml = YAML()
         self.name_index = self.gen_name_index()
 
-        self.config = self.__load_yaml__('StellarDB_config.yaml')
+        config_filename = inspect.stack()[0][1]
+        config_filename = os.path.join(os.path.dirname(config_filename), 'StellarDB_config.yaml')
+        self.config = self.__load_yaml__(config_filename)
 
     def __load_yaml__(self, fname):
         """ load yaml data from file with given filename """
@@ -55,11 +61,18 @@ class StellarDB:
                 name_index[name] = entry
         return name_index
 
-    def load(self, name):
-        """ load data for a given name """
+    def load(self, name, auto_get=True):
+        """ 
+        load data for a given name 
+        if auto_get == True, then get info from the web if no file exists
+        """
         name = name.replace(' ', '')
         if name not in self.name_index:
-            raise AttributeError('Name %s not found' % name)
+            if auto_get:
+                print('Name %s not found, retrieving info online' % name)
+                self.auto_fill(name)
+            else:
+                raise AttributeError('Name %s not found' % name)
 
         return self.__fix__(self.__load_yaml__(self.name_index[name]))
 
@@ -173,5 +186,4 @@ if __name__ == '__main__':
     target = 'GJ 1214'
     sdb = StellarDB()
     sdb.auto_fill('GJ 1214')
-    star = sdb.load(target)
-    print(star)
+    star = sdb.load(target) #Check if everything worked
