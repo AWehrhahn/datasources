@@ -135,8 +135,9 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
         endline = lines.index('')
         lines = lines[:endline]
         temp = ('{}\n' * len(lines))
+        names = [l.strip() for l in lines[0].split('|')]
         lines = str.format(temp,*lines)
-        df = pd.read_table(io.StringIO(lines), delimiter='|', usecols=[i for i in range(len(fields))])
+        df = pd.read_csv(io.StringIO(lines), delimiter='|', usecols=[i for i in range(len(fields))], names=names, header=0)
 
     df = df.applymap(lambda s: s.decode('utf-8')
                      if isinstance(s, bytes) else s)

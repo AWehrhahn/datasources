@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 
 import pycurl
 import pandas as pd
+import numpy as np
 
 from Config import config
 try:
@@ -35,14 +36,27 @@ class PSG:
         self.config = config.load_config()
         self.cache_folder = self.config['path_cache']
 
-    def curl(self, UseCache=True):
+    def curl(self, UseCache=True, **kwargs):
         """
         retrieve data as defined in the config file
         returns a string
         """
+        # type = 
+        # rad - radiance 
+        # noi - noise 
+        # trn - planetary transmittance
+        # atm - planetary flux
+        # str - stellar transmittance 
+        # tel - tellurics 
+        # srf - surface reflectance 
+        # cfg - configuration file 
+        # all - everything
+
         # help: https://psg.gsfc.nasa.gov/helpapi.php
         # curl --data-urlencode file@config.txt https://psg.gsfc.nasa.gov/api.php
-        cache = Cache.Cache(self.cache_folder, open(self.config_filename).read())
+
+        # curl -d type=trn -d whdr=n --data-urlencode file@config.txt https://psg.gsfc.nasa.gov/api.php
+        cache = Cache.Cache(self.cache_folder, open(self.config_filename).read(), kwargs)
         try:
             data = cache.load() if UseCache else None
         except IOError:
@@ -52,7 +66,9 @@ class PSG:
             print('Sending request to Planetary Spectrum Generator')
             # prepare data
             post_data = open(self.config_filename, 'rb').read()
-            postfields = urlencode({'file': post_data})
+            #postfields = {'file': post_data}
+            kwargs['file'] = post_data
+            postfields = urlencode(kwargs)
 
             # prepare curl
             buffer = BytesIO()
@@ -119,9 +135,27 @@ class PSG:
         with open(self.config_filename, 'w') as f:
             f.writelines(content)
 
-    def get_pandas(self, UseCache=True):
+    def get_data_in_range(self, wl_low, wl_high, n_parts, unit='um', **kwargs):
+        """ Use several curl request to get data for a larger wavelength spectrum """
+        #TODO automatically decide how many parts are required
+        self.change_config({'GENERATOR-RANGEUNIT': unit})
+
+        wl_parts = np.linspace(wl_low, wl_high, n_parts, endpoint=False)
+        wl_delta = (wl_high - wl_low)/n_parts
+
+        data = [None for i in range(n_parts)]
+        for i, part in enumerate(wl_parts):
+            # Change Wavelength range
+            self.change_config({'GENERATOR-RANGE1': part, 'GENERATOR-RANGE2': part+wl_delta})
+            # Get Data
+            data[i] = self.get_pandas(**kwargs)
+
+        # Combine Data
+        return pd.concat(data)
+
+    def get_pandas(self, UseCache=True, **kwargs):
         """ retrieve the data as a pandas dataframe """
-        data = self.curl(UseCache=UseCache)
+        data = self.curl(UseCache=UseCache, **kwargs)
         # Parse header to get names
         header = [line for line in data.split('\n') if line.startswith('#')]
         names = header[-1][1:].split()
@@ -132,8 +166,8 @@ class PSG:
 
 if __name__ == '__main__':
     psg = PSG()
-    psg.change_config({'GENERATOR-RANGE1': 0.5, 'GENERATOR-RANGE2': 0.55})
-    body = psg.curl()
-    df = psg.get_pandas()
+    #psg.change_config({'GENERATOR-RANGE1': 0.5, 'GENERATOR-RANGE2': 0.55})
+    df = psg.get_data_in_range(0.6, 0.8, 3, wephm='S')
     print(df.head())
+    df.to_csv('test.csv', index=False)
     pass

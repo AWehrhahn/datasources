@@ -102,8 +102,8 @@
 <SURFACE-EMISSIVITY>0.894
 <ATMOSPHERE-SUMMARY>Surface pressure: 1.0000 bar; Molecular weight: 2.35 g/mol; Surface temperature: 1476.4 K; Albedo: 0.106; Emissivity: 0.894;
 <GENERATOR-INSTRUMENT>Keck_HIRES: HIRES is the High Resolution Echelle Spectrometer at the Keck observatory on Manuakea (4200m), Hawaii. It is a grating cross-dispersed, echelle spectrograph capable of operating between 0.3 and 1.0 microns at high resolutions (RP<85,000). Several slits are available in width and length, since order separation varies between 6 and 43 arcseconds. Typical throughput is 0.15, yet it drops substantially (~0.05) beyond 0.8 um. 
-<GENERATOR-RANGE1>0.5
-<GENERATOR-RANGE2>0.55
+<GENERATOR-RANGE1>0.7333333333333334
+<GENERATOR-RANGE2>0.8
 <GENERATOR-RANGEUNIT>um
 <GENERATOR-RESOLUTION>50000
 <GENERATOR-RESOLUTIONUNIT>RP
@@ -127,8 +127,8 @@
 <GENERATOR-TRANS-SHOW>Y
 <GENERATOR-TRANS>02-01
 <GENERATOR-LOGRAD>Y
-<GENERATOR-GAS-MODEL>Y
+<GENERATOR-GAS-MODEL>N
 <GENERATOR-CONT-MODEL>Y
 <GENERATOR-CONT-STELLAR>Y
-<GENERATOR-RADUNITS>Wsrm2um
+<GENERATOR-RADUNITS>pm
 <GENERATOR-SUMMARY>Wavelength range 0.55-0.6 um with a resolution of 50000 RP. Molecular radiative-transfer enabled; Continuum flux module enabled; 

@@ -62,8 +62,8 @@ class StellarDB:
         return name_index
 
     def load(self, name, auto_get=True):
-        """ 
-        load data for a given name 
+        """
+        load data for a given name
         if auto_get == True, then get info from the web if no file exists
         """
         name = name.replace(' ', '')
@@ -103,7 +103,7 @@ class StellarDB:
     def auto_fill(self, name):
         """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
         try:
-            star = self.load(name)
+            star = self.load(name, auto_get=False)
         except AttributeError:
             star = {'name': [name]}
         name = star['name'][0]
@@ -121,6 +121,7 @@ class StellarDB:
         simbad_data = Simbad.query_object(name).to_pandas()
         simbad_data = simbad_data.applymap(lambda s: s.decode('utf-8') if isinstance(s, bytes) else s)
         simbad_data['MAIN_ID'] = simbad_data['MAIN_ID'].apply(lambda s: s.replace(' ', ''))
+        simbad_data['key'] = 1
 
         ids = Simbad.query_objectids(name)
         for n in ids:
@@ -130,10 +131,11 @@ class StellarDB:
         # Exoplanet Data
         exoplanet_data = HEASARC.getData("Position==%s" % name, fields=exoplanet_fields)
         exoplanet_data['star_name'] = exoplanet_data['star_name'].apply(lambda s: s.replace(' ', ''))
-        exoplanet_data['planet_name'] = exoplanet_data['name     ']
+        exoplanet_data['planet_name'] = exoplanet_data.iloc[:, 0]
+        exoplanet_data['key'] = 1
 
         #This relies on the Main_ID in SIMBAD and exoplanet.org to be the same
-        merge = pd.merge(simbad_data, exoplanet_data, left_on='MAIN_ID', right_on='star_name')
+        merge = pd.merge(simbad_data, exoplanet_data, on='key')
 
         # Set values according to layout        
         layout = self.load('ids')
@@ -145,6 +147,15 @@ class StellarDB:
                     return float(value)
                 if value.dtype in [np.int32, np.int64]:
                     return int(value)
+            if isinstance(value, str):
+                value = value.strip()
+                try:
+                    value = float(value)
+                    return value
+                except ValueError:
+                    pass
+                if value == 'null':
+                    return float('NaN')
             return str(value)
 
         def set_values(layout, merge, star={}):
@@ -183,7 +194,8 @@ class StellarDB:
         self.save(star)
 
 if __name__ == '__main__':
-    target = 'GJ 1214'
+    target = 'WASP-47'
     sdb = StellarDB()
-    sdb.auto_fill('GJ 1214')
-    star = sdb.load(target) #Check if everything worked
+    sdb.auto_fill(target)
+    star = sdb.load(target, auto_get=False) #Check if everything worked
+    print('Done')
