@@ -2,34 +2,27 @@
 Handle the collection of yaml files known as stellar db
 """
 import os
+import sys
 import inspect
 import numpy as np
 import pandas as pd
-from ruamel.yaml import YAML, comments
-try:
-    from ruamel.yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    print('LibYaml not installed, ')
-    from ruamel.yaml import Loader, Dumper
+import yaml
 
-
-from Config.config import load_config
-#import SIMBAD
-from astroquery.simbad import Simbad
 try:
     import HEASARC
+    import Cache
 except ModuleNotFoundError:
     from DataSources import HEASARC
+    from DataSources import Cache
 
 
 class StellarDB:
     """ Class for handling stellar_db """
 
     def __init__(self):
-        config = load_config('config.yaml')
+        config = self.load_config('config.yaml')
         self.folder = config['path_stellar_db']
         self.cache = config['path_cache']
-        self.yaml = YAML()
         self.name_index = self.gen_name_index()
 
         config_filename = inspect.stack()[0][1]
@@ -39,17 +32,31 @@ class StellarDB:
     def __load_yaml__(self, fname):
         """ load yaml data from file with given filename """
         with open(fname, 'r') as fp:
-            return self.yaml.load(fp)
+            return yaml.load(fp)
 
     def __write_yaml__(self, fname, data):
         """ write data to disk """
         with open(fname, 'w') as fp:
-            self.yaml.dump(data, fp)
+            yaml.dump(data, fp)
+
+    def load_config(self, filename='config.yaml'):
+        """ Load configuration from file """
+        filename = os.path.join(os.getcwd(), filename)
+        return self.__load_yaml__(filename)
 
     def gen_name_index(self):
         """ index all names to files containing them """
         list_of_files = [os.path.join(self.folder, x) for x in os.listdir(
             self.folder) if x.endswith('.yaml')]
+
+        cache = Cache.Cache(self.cache, *list_of_files)
+        try:
+            data = cache.load()
+        except IOError:
+            data = None
+
+        if data is not None:
+            return data
 
         name_index = {}
         for entry in list_of_files:
@@ -59,6 +66,8 @@ class StellarDB:
             for name in name_list:
                 name = name.replace(' ', '')
                 name_index[name] = entry
+        
+        cache.save(name_index)
         return name_index
 
     def load(self, name, auto_get=True):
@@ -102,6 +111,9 @@ class StellarDB:
 
     def auto_fill(self, name):
         """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
+        if 'astroquery.simbad' not in sys.modules:
+            from astroquery.simbad import Simbad
+
         try:
             star = self.load(name, auto_get=False)
         except AttributeError:
@@ -118,7 +130,10 @@ class StellarDB:
                 Simbad.add_votable_fields(f)
             except KeyError:
                 print('No field named ', f, ' found')
-        simbad_data = Simbad.query_object(name).to_pandas()
+        simbad_data = Simbad.query_object(name)
+        if simbad_data is None:
+            raise AttributeError('Star name not found')
+        simbad_data = simbad_data.to_pandas()
         simbad_data = simbad_data.applymap(lambda s: s.decode('utf-8') if isinstance(s, bytes) else s)
         simbad_data['MAIN_ID'] = simbad_data['MAIN_ID'].apply(lambda s: s.replace(' ', ''))
         simbad_data['key'] = 1
@@ -186,7 +201,7 @@ class StellarDB:
                             break
 
                 # If it is a Commeted Map, i.e. a dictionary, go into each object and repeat
-                if isinstance(entry[1], comments.CommentedMap):
+                if isinstance(entry[1], dict):
                     star[entry[0]] = set_values(entry[1], merge, star={})
             return star
 
@@ -194,7 +209,7 @@ class StellarDB:
         self.save(star)
 
 if __name__ == '__main__':
-    target = 'WASP-47'
+    target = 'GJ1214'
     sdb = StellarDB()
     sdb.auto_fill(target)
     star = sdb.load(target, auto_get=False) #Check if everything worked

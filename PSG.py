@@ -30,7 +30,7 @@ class PSG:
         else:
             this_dir = inspect.stack()[0][1]  # Directory of this file
             this_dir = dirname(this_dir)
-            self.config_filename = join(this_dir, 'psg_config.xml')
+            self.config_filename = join(this_dir, 'psg_config.txt')
 
         self.url = 'https://psg.gsfc.nasa.gov/api.php'
         self.config = config.load_config()
@@ -167,7 +167,7 @@ class PSG:
 if __name__ == '__main__':
     psg = PSG()
     #psg.change_config({'GENERATOR-RANGE1': 0.5, 'GENERATOR-RANGE2': 0.55})
-    df = psg.get_data_in_range(0.6, 0.8, 3, wephm='S')
+    df = psg.get_data_in_range(0.6, 1.0, 50)
     print(df.head())
     df.to_csv('test.csv', index=False)
     pass

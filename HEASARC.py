@@ -128,7 +128,7 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
     logging.info('Getting data from HEARSEC')
     df = pd.DataFrame(index=range(len(dataset)), columns=fields)
 
-    for i, source in zip(range(len(dataset)), dataset):
+    for source in dataset:
         obsids = heasarc(catalogue, source, fields=fields)
         text = obsids.text
         lines = text.split('\n')
