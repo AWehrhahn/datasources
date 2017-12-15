@@ -16,11 +16,12 @@ import pycurl
 import pandas as pd
 import numpy as np
 
-from Config import config
 try:
+    import config
     import Cache
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     from DataSources import Cache
+    from DataSources import config
 
 class PSG:
     """ interface for the Planetary Spectrum Generator Webservice of NASA Goddard """
