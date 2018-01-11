@@ -19,7 +19,7 @@ import numpy as np
 try:
     import config
     import Cache
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     from DataSources import Cache
     from DataSources import config
 

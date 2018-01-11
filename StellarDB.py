@@ -37,7 +37,7 @@ class StellarDB:
     def __write_yaml__(self, fname, data):
         """ write data to disk """
         with open(fname, 'w') as fp:
-            yaml.dump(data, fp)
+            yaml.dump(data, fp, default_flow_style=False)
 
     def load_config(self, filename='config.yaml'):
         """ Load configuration from file """
@@ -171,6 +171,8 @@ class StellarDB:
                     pass
                 if value == 'null':
                     return float('NaN')
+            if isinstance(value, (float, int)):
+                return value
             return str(value)
 
         def set_values(layout, merge, star={}):
@@ -183,12 +185,15 @@ class StellarDB:
                     star['planets'] = {}
                     for _, planet in merge.iterrows():
                         name = planet['planet_name'][-1]
-                        star['planets'][name] = set_values(entry[1]['name'], merge, star={})
+                        star['planets'][name] = set_values(entry[1]['name'], planet, star={})
                     continue
 
                 # If only one label is given use that one
                 if isinstance(entry[1], str):
-                    value = to_baseclass(merge[entry[1]][0])
+                    if isinstance(merge[entry[1]], (list, pd.Series, pd.DataFrame)):
+                        value = to_baseclass(merge[entry[1]][0])
+                    else:
+                        value = to_baseclass(merge[entry[1]])
                     star[entry[0]] = value
                 
                 # If there is a list then use the first that is not Null
@@ -209,7 +214,7 @@ class StellarDB:
         self.save(star)
 
 if __name__ == '__main__':
-    target = 'GJ1214'
+    target = 'Trappist-1'
     sdb = StellarDB()
     sdb.auto_fill(target)
     star = sdb.load(target, auto_get=False) #Check if everything worked
