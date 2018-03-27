@@ -136,7 +136,7 @@ class PSG:
         with open(self.config_filename, 'w') as f:
             f.writelines(content)
 
-    def get_data_in_range(self, wl_low, wl_high, n_parts, unit='um', **kwargs):
+    def get_data_in_range(self, wl_low, wl_high, n_parts, unit='An', **kwargs):
         """ Use several curl request to get data for a larger wavelength spectrum """
         #TODO automatically decide how many parts are required
         self.change_config({'GENERATOR-RANGEUNIT': unit})
