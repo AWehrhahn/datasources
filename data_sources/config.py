@@ -28,4 +28,8 @@ def load_config(filename=None):
     if filename is None:
         filename = os.path.dirname(__file__)
         filename = os.path.join(filename, "config.yaml")
-    return load_yaml(filename)
+    c = load_yaml(filename)
+
+    for k, v in c.items():
+        c[k] = os.path.expanduser(v)
+    return c
