@@ -105,13 +105,13 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
     return txt
 
 
-def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='./DATA/HEARSEC', UseCache=True, maxresults=100):
+def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='~/.cache/HEASARC', UseCache=True, maxresults=100):
     """
     dataset examples: (no blanks!) 
         - Position==eps_Eri
         - TRANSIT==1
     """
-    logging.info('Loading HEARSEC data')
+    logging.info('Loading HEASARC data')
     if isinstance(dataset, str):
         dataset = (dataset, )
 
@@ -124,7 +124,7 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
     if data is not None:
         return data
 
-    logging.info('Getting data from HEARSEC')
+    logging.info('Getting data from HEASARC')
     df = pd.DataFrame(index=range(len(dataset)), columns=fields)
 
     for source in dataset:

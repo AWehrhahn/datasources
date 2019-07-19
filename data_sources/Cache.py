@@ -7,8 +7,8 @@ import pandas as pd
 
 
 class Cache:
-    def __init__(self,folder = './',*info):
-        self.folder = folder
+    def __init__(self,folder='~/.cache',*info):
+        self.folder = os.path.expanduser(folder)
         self.filename = self.createFilename(folder,info)
 
     def createFilename(self,folder,*info):
