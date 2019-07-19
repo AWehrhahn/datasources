@@ -31,18 +31,14 @@ def from_ESO_Archive(star, instrument, cache_folder='/DATA/Cache/', UseCache=Tru
 
     cache = Cache.Cache(cache_folder, star, instrument)
     if UseCache:
-        try:
-            data = cache.load()
-            if data is not None:
-                data['OBJECT'] = [star for i in range(len(data['OBJECT']))]
-            print('Successfully loaded data for Star ', star)
-            return data
-        except IOError:
-            df = None
+        data = cache.load()
+        print('Successfully loaded data for Star ', star)
+        return data
     else:
         df = None
 
-    host = "http://archive.eso.org/wdb/wdb/eso/eso_archive_main/query"
+    host = "http://archive.eso.org/wdb/wdb/adp/phase3_spectral/query"
+    # host = "http://archive.eso.org/wdb/wdb/eso/eso_archive_main/query"
     params = {
         'wdbo': 'csv',
         'target': star,
@@ -61,17 +57,16 @@ def from_ESO_Archive(star, instrument, cache_folder='/DATA/Cache/', UseCache=Tru
 
     # Check if results are empty
     if 'No data returned !' in r.text:
-        df = None
-    else:
-        try:
-            df = pd.DataFrame(pd.read_csv(
-                io.StringIO(r.text), sep=',', comment='#'))
-            df['OBJECT'] = [star for i in range(len(df['OBJECT']))]
-        except pd.errors.ParserError:
-            df = None
+        raise ValueError(r.text)
+    
+    try:
+        df = pd.read_csv(
+            io.StringIO(r.text), sep=',', dtype=str, skiprows=2, skipfooter=4)
+        df['Object'] = [star for i in range(len(df['Object']))]
+    except pd.errors.ParserError:
+        raise ValueError(r.text)
 
     cache.save(df)
-
     print('Successfully loaded data for Star ', star)
     return df
 

@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from astroquery.simbad import Simbad
+
 try:
-    import HEASARC
-    import Cache
+    from . import HEASARC
+    from . import Cache
 except ModuleNotFoundError:
     from DataSources import HEASARC
     from DataSources import Cache
@@ -20,7 +22,9 @@ class StellarDB:
     """ Class for handling stellar_db """
 
     def __init__(self):
-        config = self.load_config('config.yaml')
+        config_file = "config.yaml"
+        config_file = os.path.join(os.path.dirname(__file__), config_file)
+        config = self.load_config(config_file)
         self.folder = config['path_stellar_db']
         self.cache = config['path_cache']
         self.name_index = self.gen_name_index()
@@ -66,7 +70,7 @@ class StellarDB:
             for name in name_list:
                 name = name.replace(' ', '')
                 name_index[name] = entry
-        
+
         cache.save(name_index)
         return name_index
 
@@ -89,7 +93,7 @@ class StellarDB:
         """ save data for star with given name """
         name = star['name'][0].replace(' ', '')
         if name not in self.name_index:
-            print('WARNING: Name not found, creating new entry')
+            print(f'WARNING: Name {name} not found, creating new entry')
             filename = name + '.yaml'
             i = 1
             while os.path.exists(os.path.join(self.folder, filename)):
@@ -111,9 +115,6 @@ class StellarDB:
 
     def auto_fill(self, name):
         """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
-        if 'astroquery.simbad' not in sys.modules:
-            from astroquery.simbad import Simbad
-
         try:
             star = self.load(name, auto_get=False)
         except AttributeError:
@@ -130,7 +131,14 @@ class StellarDB:
                 Simbad.add_votable_fields(f)
             except KeyError:
                 print('No field named ', f, ' found')
-        simbad_data = Simbad.query_object(name)
+
+        for _ in range(10):
+            try:
+                simbad_data = Simbad.query_object(name)
+                break
+            except Exception:
+                continue
+
         if simbad_data is None:
             raise AttributeError('Star name not found')
         simbad_data = simbad_data.to_pandas()
@@ -138,7 +146,14 @@ class StellarDB:
         simbad_data['MAIN_ID'] = simbad_data['MAIN_ID'].apply(lambda s: s.replace(' ', ''))
         simbad_data['key'] = 1
 
-        ids = Simbad.query_objectids(name)
+        # Give it a few tries, just in case
+        for _ in range(10):
+            try:
+                ids = Simbad.query_objectids(name)
+                break
+            except Exception:
+                continue
+
         for n in ids:
             if n[0] not in star['name']:
                 star['name'].append(n[0])
@@ -150,9 +165,12 @@ class StellarDB:
         exoplanet_data['key'] = 1
 
         #This relies on the Main_ID in SIMBAD and exoplanet.org to be the same
-        merge = pd.merge(simbad_data, exoplanet_data, on='key')
+        if len(exoplanet_data) != 0:
+            merge = pd.merge(simbad_data, exoplanet_data, on='key')
+        else:
+            merge = simbad_data
 
-        # Set values according to layout        
+        # Set values according to layout
         layout = self.load('ids')
 
         def to_baseclass(value):
@@ -181,29 +199,32 @@ class StellarDB:
                 if entry[0] in ['name']:
                     continue
                 #for planets
-                if entry[0]  == 'planets':
-                    star['planets'] = {}
-                    for _, planet in merge.iterrows():
-                        name = planet['planet_name'][-1]
-                        star['planets'][name] = set_values(entry[1]['name'], planet, star={})
+                if entry[0] == 'planets':
+                    if "planet_name" in merge.keys():
+                        star['planets'] = {}
+                        for _, planet in merge.iterrows():
+                            name = planet['planet_name'][-1]
+                            star['planets'][name] = set_values(entry[1]['name'], planet, star={})
                     continue
 
                 # If only one label is given use that one
                 if isinstance(entry[1], str):
-                    if isinstance(merge[entry[1]], (list, pd.Series, pd.DataFrame)):
-                        value = to_baseclass(merge[entry[1]][0])
-                    else:
-                        value = to_baseclass(merge[entry[1]])
-                    star[entry[0]] = value
+                    if entry[1] in merge.keys():
+                        if isinstance(merge[entry[1]], (list, pd.Series, pd.DataFrame)):
+                            value = to_baseclass(merge[entry[1]][0])
+                        else:
+                            value = to_baseclass(merge[entry[1]])
+                        star[entry[0]] = value
                 
                 # If there is a list then use the first that is not Null
                 if isinstance(entry[1], list):
                     star[entry[0]] = None
                     for ent in entry[1]:
-                        value = to_baseclass(merge[ent][0])
-                        if value is not None and not np.isnan(value):
-                            star[entry[0]] = value
-                            break
+                        if ent in merge.keys():
+                            value = to_baseclass(merge[ent][0])
+                            if value is not None and not np.isnan(value):
+                                star[entry[0]] = value
+                                break
 
                 # If it is a Commeted Map, i.e. a dictionary, go into each object and repeat
                 if isinstance(entry[1], dict):

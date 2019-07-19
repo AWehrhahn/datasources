@@ -73,7 +73,7 @@ class heasarc(object):
 
         field,val = query.split('==')
         querydic[field] = val
-        
+
         #"Format":"VOTable"}       # VOTable does not currently work, as the connection fails
         querydic['tablehead'] = "name%3dBATCHRETRIEVALCATALOG%5f2%2e0 " + \
             str(self.table)
@@ -106,7 +106,7 @@ def makeStrList(elements, seperator=', ', removeLastSeperator=True):
     return txt
 
 
-def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='./DATA/HEARSEC', UseCache=True):
+def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'number_planets'), folder='./DATA/HEARSEC', UseCache=True, maxresults=100):
     """
     dataset examples: (no blanks!) 
         - Position==eps_Eri
@@ -116,7 +116,7 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
     if isinstance(dataset, str):
         dataset = (dataset, )
 
-    cache = Cache.Cache(folder, dataset, catalogue, fields)
+    cache = Cache.Cache(folder, dataset, catalogue, fields, maxresults)
     try:
         data = cache.load() if UseCache else None
     except IOError:
@@ -129,7 +129,7 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
     df = pd.DataFrame(index=range(len(dataset)), columns=fields)
 
     for source in dataset:
-        obsids = heasarc(catalogue, source, fields=fields)
+        obsids = heasarc(catalogue, source, fields=fields, max_results=maxresults)
         text = obsids.text
         lines = text.split('\n')
         endline = lines.index('')
