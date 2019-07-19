@@ -7,3 +7,4 @@ __pycache__/HEASARC.cpython-36.pyc
 .vscode/.ropeproject/objectdb
 __pycache__/HEASARC.cpython-36.pyc
 psg_config.xml
+data_sources.egg-info/

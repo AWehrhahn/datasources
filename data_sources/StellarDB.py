@@ -10,12 +10,8 @@ import yaml
 
 from astroquery.simbad import Simbad
 
-try:
-    from . import HEASARC
-    from . import Cache
-except ModuleNotFoundError:
-    from DataSources import HEASARC
-    from DataSources import Cache
+from . import HEASARC
+from . import Cache
 
 
 class StellarDB:

@@ -13,11 +13,10 @@ import socket
 import re
 import logging
 import io
-try:
-    import Cache
-except ModuleNotFoundError:
-    from DataSources import Cache
 import pandas as pd
+
+
+from . import Cache
 
 # to do: sanitize input (i.e.  make switches for complicated args) 'Galactic:
 # LII BII'

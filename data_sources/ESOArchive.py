@@ -5,7 +5,7 @@ import io
 
 import pandas as pd
 import requests
-from DataSources import Cache
+from . import Cache
 
 # http://archive.eso.org/cms/faq/how-do-i-programmatically-access-the-archive.html
 # http://archive.eso.org/cms/faq/how-do-i-submit-a-request-to-the-archive-programmatically.html

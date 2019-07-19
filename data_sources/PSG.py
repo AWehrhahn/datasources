@@ -16,12 +16,8 @@ import pycurl
 import pandas as pd
 import numpy as np
 
-try:
-    import config
-    import Cache
-except ImportError:
-    from DataSources import Cache
-    from DataSources import config
+from . import Cache
+from . import config
 
 class PSG:
     """ interface for the Planetary Spectrum Generator Webservice of NASA Goddard """

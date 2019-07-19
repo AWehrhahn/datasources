@@ -7,7 +7,7 @@ import astropy.io.votable as votable
 from astropy.table import Table
 from astroquery.simbad import Simbad
 
-import Cache
+from . import Cache
 
 
 def getNotes(starID):
