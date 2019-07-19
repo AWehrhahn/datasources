@@ -6,5 +6,5 @@ setup(
     author="Ansgar Wehrhahn",
     author_email="ansgar.wehrhahn@physics.uu.se",
     packages=find_packages(),
-    install_requires=["numpy", "pycurl", "astropy", "astroquery", "pandas", "requests", "pyyaml"]
+    install_requires=["numpy", "astropy", "astroquery", "pandas", "requests", "pyyaml"]
 )

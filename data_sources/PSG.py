@@ -12,6 +12,8 @@ from os.path import join, dirname
 from io import BytesIO, StringIO
 from urllib.parse import urlencode
 
+#TODO use wget instead of pycurl
+# or urllib?
 import pycurl
 import pandas as pd
 import numpy as np
