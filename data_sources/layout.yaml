@@ -1,0 +1,43 @@
+name:                       # Name of the star
+  - ids
+
+coordinates:
+  ra: RA
+  dec: DEC
+
+radius: [Diameter_diameter, star_radius]  # Stellar radius (in sun radii)
+radial_velocity: RV_VALUE                 # Radial velocity start in km/s
+mass: star_mass                           # Stellar mass (in sun masses)
+t_eff: [star_t_eff, Fe_H_Teff]            # effective temperature in Kelvin
+logg: [Fe_H_log_g, star_log_g]            # surface gravity in cm/s**2
+vel_turb: [ROT_Vsini, star_v_sin_i]       # turbulent velocity in km/s
+metallicity: [Fe_H_Fe_H, metallicity]     # metallicity in solar abundaces log(met/Z_sol)
+proper_motion:                            # Proper motion in mas/yr 
+  ra: PMRA                                # ra
+  dec: PMDEC                              # dec
+parallax: PLX_VALUE                       # Parallax in mas
+spectral_type: SP_TYPE                    # Spectral type
+object_type: OTYPE                        # Object type
+
+flux:
+  U: FLUX_U
+  B: FLUX_B
+  V: FLUX_V
+  R: FLUX_R
+  I: FLUX_I
+  G: FLUX_G
+  J: FLUX_J
+  H: FLUX_H
+  K: FLUX_K
+
+planets:
+  name:
+    radius: planet_radius                     # Planetary radius (in jupiter radii)
+    mass: planet_mass                         # Planetary mass (in jupiter masses)
+    semi_major_axis: semi_major_axis          # Semi-major axis of exoplanet (AU)
+    inclination: inclination                  # Inclination of orbit (degrees)
+    eccentricity: eccentricity
+    period: orbital_period                    # Orbital period (days)
+    transit_epoch: transit_epoch              # Primary transit (JD - 240k)
+    transit_duration: transit_dur             # Transit duration (days)
+    

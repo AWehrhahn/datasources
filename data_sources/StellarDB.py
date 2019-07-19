@@ -10,22 +10,19 @@ import pandas as pd
 import yaml
 from astroquery.simbad import Simbad
 
-from . import HEASARC, Cache
+from . import HEASARC, Cache, config as Config
 
 
 class StellarDB:
     """ Class for handling stellar_db """
 
     def __init__(self):
-        config_file = "config.yaml"
-        config_file = os.path.join(os.path.dirname(__file__), config_file)
-        config = self.load_config(config_file)
+        config = Config.load_config()
         self.folder = config['path_stellar_db']
         self.cache = config['path_cache']
         self.name_index = self.gen_name_index()
 
-        config_filename = inspect.stack()[0][1]
-        config_filename = os.path.join(os.path.dirname(config_filename), 'StellarDB_config.yaml')
+        config_filename = os.path.join(os.path.dirname(__file__), 'StellarDB_config.yaml')
         self.config = self.__load_yaml__(config_filename)
 
     def __load_yaml__(self, fname):
@@ -38,10 +35,9 @@ class StellarDB:
         with open(fname, 'w') as fp:
             yaml.dump(data, fp, default_flow_style=False)
 
-    def load_config(self, filename='config.yaml'):
-        """ Load configuration from file """
-        filename = os.path.join(os.getcwd(), filename)
-        return self.__load_yaml__(filename)
+    def __load_layout__(self):
+        fname = os.path.join(os.path.dirname(__file__), "layout.yaml")
+        return self.__fix__(self.__load_yaml__(fname))
 
     def gen_name_index(self):
         """ index all names to files containing them """
@@ -166,7 +162,7 @@ class StellarDB:
             merge = simbad_data
 
         # Set values according to layout
-        layout = self.load('ids')
+        layout = self.__load_layout__()
 
         def to_baseclass(value):
             """ fix type of value to a python base class """
