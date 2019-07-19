@@ -1,17 +1,16 @@
 """
 Handle the collection of yaml files known as stellar db
 """
+import inspect
 import os
 import sys
-import inspect
+
 import numpy as np
 import pandas as pd
 import yaml
-
 from astroquery.simbad import Simbad
 
-from . import HEASARC
-from . import Cache
+from . import HEASARC, Cache
 
 
 class StellarDB:

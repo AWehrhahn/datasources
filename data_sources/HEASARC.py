@@ -8,13 +8,13 @@ Feel free to contribute to the project.
 Adapted to Python 3.5 by Ansgar Wehrhahn
 """
 
-import urllib
-import socket
-import re
-import logging
 import io
-import pandas as pd
+import logging
+import re
+import socket
+import urllib
 
+import pandas as pd
 
 from . import Cache
 
