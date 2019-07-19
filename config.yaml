@@ -1,8 +1,0 @@
-# Configuration file for test.py
-
-# Define locations of stellar config files, as well as input and output folders
-# Only use '/' as path seperator, even on Windows systems
-path_stellar_db: /DATA/stellar_db/
-path_input_data: /DATA/test/
-path_output_data: /DATA/output/
-path_cache: /DATA/Cache/
