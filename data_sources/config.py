@@ -23,7 +23,9 @@ def load_yaml(fname):
     raise IOError
 
 
-def load_config(filename='config.yaml'):
+def load_config(filename=None):
     """ Load configuration from file """
-    filename = os.path.join(os.getcwd(), filename)
+    if filename is None:
+        filename = os.path.dirname(__file__)
+        filename = os.path.join(filename, "config.yaml")
     return load_yaml(filename)
