@@ -2,14 +2,12 @@ import hashlib
 import logging
 import os
 import pickle
-
-import pandas as pd
-
+from functools import wraps
 
 class Cache:
     def __init__(self,folder='~/.cache',*info):
         self.folder = os.path.expanduser(folder)
-        self.filename = self.createFilename(self.folder,info)
+        self.filename = self.createFilename(self.folder, info)
 
     def createFilename(self,folder,*info):
         #Create a file cashe to avoid using SIMBAD to much
@@ -23,9 +21,8 @@ class Cache:
             logging.info('Cached file found: %s' %  self.filename)
             with open(self.filename,'rb') as f:
                 return pickle.load(f)
-            #return pd.read_pickle(self.filename)
         logging.info('No cached file found')
-        raise IOError('File not found')
+        raise FileNotFoundError('File not found')
 
     def save(self,data):
         if not os.path.isdir(self.folder):
@@ -34,3 +31,22 @@ class Cache:
             pickle.dump(data,f,pickle.HIGHEST_PROTOCOL)
             logging.info('Data cached at: %s' % self.filename)
         #data.to_pickle(self.filename)
+
+class UseCache:
+    def __init__(self, folder='~/.cache'):
+        self.folder = folder
+
+    def __call__(self, func):
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            cache = Cache(self.folder, *args, *kwargs.values())
+            try:
+                data = cache.load()
+            except FileNotFoundError:
+                data = func(*args, **kwargs)
+                cache.save(data)
+            finally:
+                return data
+
+        return wrapper

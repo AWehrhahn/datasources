@@ -54,7 +54,7 @@ def Query_ID(name, cache_folder='./DATA/SIMBAD/', UseCache=True):
     cache = Cache.Cache(cache_folder, name, 'id_query')
     try:
         data = cache.load() if UseCache else None
-    except IOError:
+    except FileNotFoundError:
         data = None
 
     if data is not None:
@@ -78,7 +78,7 @@ def getFromSimbad(stars, fields, table_format='pandas', cache_folder='./DATA/SIM
     cache = Cache.Cache(cache_folder, stars, fields, format)
     try:
         data = cache.load() if UseCache else None
-    except IOError:
+    except FileNotFoundError:
         data = None
 
     if data is not None:

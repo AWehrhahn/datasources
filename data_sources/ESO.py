@@ -22,7 +22,7 @@ def login(user):
     return eso
 
 
-def fromArchive(dataset, folder='./DATA/ESO'):
+def fromArchive(dataset, folder='/DATA/ESO'):
     if type(dataset) == str:
         dataset = (dataset,)
 

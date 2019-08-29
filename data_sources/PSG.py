@@ -168,7 +168,7 @@ class PSG:
         cache = Cache.Cache(self.cache_folder, str(self.psg_config), kwargs)
         try:
             data = cache.load() if UseCache else None
-        except IOError:
+        except FileNotFoundError:
             data = None
 
         if data is None:
@@ -240,7 +240,7 @@ class PSG:
         
         # Determine the steps to do
         n_steps = (wl_high - wl_low) / wl_step
-        n_steps = int(np.ceil(n_steps))
+        n_steps = int(np.ceil(n_steps)) + 1
 
         wl_parts = [wl_low + i * wl_step for i in range(n_steps)]
 
@@ -252,7 +252,7 @@ class PSG:
             data[i] = self.get_pandas(**kwargs)
 
         # Combine Data
-        return pd.concat(data)
+        return pd.concat(data, sort=True)
 
     def get_pandas(self, UseCache=True, **kwargs):
         """ retrieve the data as a pandas dataframe """

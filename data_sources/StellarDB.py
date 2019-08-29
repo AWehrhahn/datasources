@@ -8,6 +8,7 @@ import sys
 import numpy as np
 import pandas as pd
 import yaml
+
 from astroquery.simbad import Simbad
 
 from . import HEASARC, Cache, config as Config
@@ -47,7 +48,7 @@ class StellarDB:
         cache = Cache.Cache(self.cache, *list_of_files)
         try:
             data = cache.load()
-        except IOError:
+        except FileNotFoundError:
             data = None
 
         if data is not None:

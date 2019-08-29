@@ -118,7 +118,7 @@ def getData(dataset, catalogue='exoplanodb', fields=('name', 'star_name', 'numbe
     cache = Cache.Cache(folder, dataset, catalogue, fields, maxresults)
     try:
         data = cache.load() if UseCache else None
-    except IOError:
+    except FileNotFoundError:
         data = None
 
     if data is not None:
