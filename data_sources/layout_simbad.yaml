@@ -1,0 +1,29 @@
+name: ids
+
+coordinates:
+  ra: [RA, hourangle]
+  dec: [DEC, deg]
+
+radius: [Diameter_diameter, R_sun]
+radial_velocity: [RV_VALUE, km / s]
+t_eff: [Fe_H_Teff, K]
+logg: Fe_H_log_g
+metallicity: Fe_H_Fe_H
+velocity_turbulence: [ROT_Vsini, km / s]
+proper_motion:
+  ra: [PMRA, mas/year]
+  dec: [PMDEC, mas/year]
+parallax: [PLX_VALUE, mas]
+spectral_type: SP_TYPE
+object_type: OTYPE
+
+flux:
+  U: [FLUX_U, mag]
+  B: [FLUX_B, mag]
+  V: [FLUX_V, mag]
+  R: [FLUX_R, mag]
+  I: [FLUX_I, mag]
+  G: [FLUX_G, mag]
+  J: [FLUX_J, mag]
+  H: [FLUX_H, mag]
+  K: [FLUX_K, mag]

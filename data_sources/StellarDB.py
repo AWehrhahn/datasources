@@ -5,14 +5,20 @@ import inspect
 import os
 import sys
 
+import astropy.units as u
+import astropy.coordinates as coords
+
 import numpy as np
 import pandas as pd
-import yaml
+# import yaml
 
 from astroquery.simbad import Simbad
+from astroquery.exoplanet_orbit_database import ExoplanetOrbitDatabase
+from astropy.io.misc import yaml
 
-from . import HEASARC, Cache, config as Config
+from . import Cache, config as Config
 
+# TODO use json instead of yaml
 
 class StellarDB:
     """ Class for handling stellar_db """
@@ -36,9 +42,9 @@ class StellarDB:
         with open(fname, 'w') as fp:
             yaml.dump(data, fp, default_flow_style=False)
 
-    def __load_layout__(self):
-        fname = os.path.join(os.path.dirname(__file__), "layout.yaml")
-        return self.__fix__(self.__load_yaml__(fname))
+    def load_layout(self, name):
+        fname = os.path.join(os.path.dirname(__file__), f"layout_{name.lower()}.yaml")
+        return self.__load_yaml__(fname)
 
     def gen_name_index(self):
         """ index all names to files containing them """
@@ -105,6 +111,65 @@ class StellarDB:
 
         return star
 
+
+    def to_base_type(self, value):
+        if isinstance(value, np.str_):
+            return str(value)
+        elif isinstance(value, np.floating):
+            return float(value)
+        elif isinstance(value, np.integer):
+            return int(value)
+        elif isinstance(value, list):
+            return [self.to_base_type(s) for s in value]
+        else:
+            return value
+
+    def set_values(self, data, layout, **kwargs):
+        """
+        Fill the fields in layout, with data from data and keywords
+        
+        Parameters
+        ----------
+        data : dict
+            input data
+        layout : dict
+            target layout of the data
+        """
+
+        result = {}
+        for key in layout:
+            data_key = layout[key]
+            unit = None
+            if isinstance(data_key, list):
+                data_key, unit = data_key
+            elif isinstance(data_key, dict):
+                result[key] = self.set_values(data, data_key, **kwargs)
+                continue
+        
+            try:
+                value = data[data_key].array[0]
+            except AttributeError:
+                # Its not a pandas array
+                value = data[data_key]
+            except KeyError:
+                # Data not in data, get it from keyword args
+                value = kwargs[data_key]
+
+            if np.ma.is_masked(value) or value is np.nan:
+                continue
+
+            value = self.to_base_type(value)
+
+            if unit is not None:
+                if isinstance(value, str):
+                    value = coords.Angle(value, unit)
+                else:    
+                    value *= u.Unit(unit)
+            result[key] = value
+
+        return result
+
+
     def auto_fill(self, name):
         """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
         try:
@@ -136,7 +201,6 @@ class StellarDB:
         simbad_data = simbad_data.to_pandas()
         simbad_data = simbad_data.applymap(lambda s: s.decode('utf-8') if isinstance(s, bytes) else s)
         simbad_data['MAIN_ID'] = simbad_data['MAIN_ID'].apply(lambda s: s.replace(' ', ''))
-        simbad_data['key'] = 1
 
         # Give it a few tries, just in case
         for _ in range(10):
@@ -145,85 +209,33 @@ class StellarDB:
                 break
             except Exception:
                 continue
+        # To keep the order of elements
+        ids = list(ids["ID"])
+        ids, ind = np.unique(star["name"] + ids, return_index=True)
+        ids = list(ids[np.argsort(ind)])
 
-        for n in ids:
-            if n[0] not in star['name']:
-                star['name'].append(n[0])
+        simbad_data = dict(simbad_data)
+        layout = self.load_layout("simbad")
+        data = self.set_values(simbad_data, layout, ids=ids)
 
         # Exoplanet Data
-        exoplanet_data = HEASARC.getData("Position==%s" % name, fields=exoplanet_fields)
-        exoplanet_data['star_name'] = exoplanet_data['star_name'].apply(lambda s: s.replace(' ', ''))
-        exoplanet_data['planet_name'] = exoplanet_data.iloc[:, 0]
-        exoplanet_data['key'] = 1
+        planets = {}
+        layout = self.load_layout("exoplanets")
+        for comp in ["b", "c", "d", "e", "f", "g"]:
+            try:
+                exoplanet_data = ExoplanetOrbitDatabase.query_planet(f"{name} {comp}")
+                exoplanet_data = self.set_values(exoplanet_data, layout)
+                exoplanet_data["planets"] = {comp: exoplanet_data["planets"]}
+                planets[comp] = exoplanet_data
+            except KeyError:
+                # Planet not found (and we don't expect any more)
+                break
 
-        #This relies on the Main_ID in SIMBAD and exoplanet.org to be the same
-        if len(exoplanet_data) != 0:
-            merge = pd.merge(simbad_data, exoplanet_data, on='key')
-        else:
-            merge = simbad_data
+        # Combine datasets
+        star.update(data)
+        for p in planets.values():
+            star.update(p)
 
-        # Set values according to layout
-        layout = self.__load_layout__()
-
-        def to_baseclass(value):
-            """ fix type of value to a python base class """
-            if isinstance(value, (np.ndarray, np.generic)):
-                if value.dtype in [np.float32, np.float64]:
-                    return float(value)
-                if value.dtype in [np.int32, np.int64]:
-                    return int(value)
-            if isinstance(value, str):
-                value = value.strip()
-                try:
-                    value = float(value)
-                    return value
-                except ValueError:
-                    pass
-                if value == 'null':
-                    return float('NaN')
-            if isinstance(value, (float, int)):
-                return value
-            return str(value)
-
-        def set_values(layout, merge, star={}):
-            """ set values in merge, as described in layout """
-            for entry in layout.items():
-                if entry[0] in ['name']:
-                    continue
-                #for planets
-                if entry[0] == 'planets':
-                    if "planet_name" in merge.keys():
-                        star['planets'] = {}
-                        for _, planet in merge.iterrows():
-                            name = planet['planet_name'][-1]
-                            star['planets'][name] = set_values(entry[1]['name'], planet, star={})
-                    continue
-
-                # If only one label is given use that one
-                if isinstance(entry[1], str):
-                    if entry[1] in merge.keys():
-                        if isinstance(merge[entry[1]], (list, pd.Series, pd.DataFrame)):
-                            value = to_baseclass(merge[entry[1]][0])
-                        else:
-                            value = to_baseclass(merge[entry[1]])
-                        star[entry[0]] = value
-                
-                # If there is a list then use the first that is not Null
-                if isinstance(entry[1], list):
-                    star[entry[0]] = None
-                    for ent in entry[1]:
-                        if ent in merge.keys():
-                            value = to_baseclass(merge[ent][0])
-                            if value is not None and not np.isnan(value):
-                                star[entry[0]] = value
-                                break
-
-                # If it is a Commeted Map, i.e. a dictionary, go into each object and repeat
-                if isinstance(entry[1], dict):
-                    star[entry[0]] = set_values(entry[1], merge, star={})
-            return star
-
-        star = set_values(layout, merge, star=star)
         self.save(star)
 
 if __name__ == '__main__':

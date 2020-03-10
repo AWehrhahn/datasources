@@ -21,8 +21,12 @@ SIMBAD_fields:
  - flux(K)
 
 exoplanet_fields:
- - name
- - star_name
+ - NAME
+ - STAR
+ - DIST
+ - PAR
+ - MSTAR
+ - RSTAR
  - number_planets
  - star_radius
  - star_t_eff

@@ -188,7 +188,8 @@ class PSG:
                 cache.save(data)
             print('... Done')
         else:
-            print('Using cached PSG data')
+            pass
+            # print('Using cached PSG data')
 
         return data
 
