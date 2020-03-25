@@ -172,6 +172,8 @@ class StellarDB:
             if unit is not None:
                 if isinstance(value, str):
                     value = coords.Angle(value, unit)
+                elif isinstance(value, u.Quantity):
+                    value = value.to_value(u.one) * u.Unit(unit)
                 else:
                     value *= u.Unit(unit)
             result[key] = value
@@ -259,4 +261,3 @@ if __name__ == "__main__":
     sdb.auto_fill(target)
     star = sdb.load(target, auto_get=False)  # Check if everything worked
     print("Done")
-
