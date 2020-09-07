@@ -1,4 +1,6 @@
 include data_sources/config.yaml
 include data_sources/psg_config.txt
 include data_sources/StellarDB_config.yaml
-include data_sources/layout.yaml
+
+include data_sources/layout_simbad.yaml
+include data_sources/layout_exoplanets.yaml
