@@ -17,12 +17,14 @@ class Cache:
         return os.path.join(folder,filename)
 
     def load(self):
-        if os.path.isfile(self.filename):
-            logging.info('Cached file found: %s' %  self.filename)
+        try:
             with open(self.filename,'rb') as f:
                 return pickle.load(f)
-        logging.info('No cached file found')
-        raise FileNotFoundError('File not found')
+            logging.info('Cached file found: %s' %  self.filename)
+        except FileNotFoundError, ValueError:
+            # The load will fail with a ValueError if the pickle version changed
+            logging.info('No cached file found')
+            raise FileNotFoundError('File not found')
 
     def save(self,data):
         if not os.path.isdir(self.folder):
