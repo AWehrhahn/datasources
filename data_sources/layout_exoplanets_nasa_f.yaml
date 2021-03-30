@@ -1,0 +1,120 @@
+# All entries come with units already, so don't put them here again
+coordinates:
+  __module__: astropy.coordinates 
+  __class__: SkyCoord
+  ra: 
+    name: ra_str
+    unit: hourangle
+  dec: 
+    name: dec_str
+    unit: hourangle
+
+radius: 
+  name: fst_rad
+  ref: fst_rad_reflink
+  unc: [fst_raderr1, fst_raderr2]
+mass: 
+  name: fst_mass
+  ref: fst_mass_reflink
+  unc: [fst_masserr1, fst_masserr2]
+radial_velocity: 
+  name: fst_radv
+  unc: [fst_radverr1, fst_radverr2]
+  ref: fst_radv_reflink
+t_eff: 
+  name: fst_teff
+  unc: [fst_tefferr1, fst_tefferr2]
+  ref: fst_teff_reflink
+logg: 
+  name: fst_logg
+  ref: fst_logg_reflink
+  unc: [fst_loggerr1, fst_loggerr2]
+velocity_rotation: 
+  name: fst_vsini
+  unc: [fst_vsinerr1, fst_vsinerr2]
+  ref: fst_vsin_reflink
+metallicity: 
+  name: fst_metfe
+  ref: fst_met_reflink
+  unc: [fst_meterr1, fst_meterr2]
+density : 
+  name: fst_dens
+  unc: [fst_denserr1, fst_denserr2]
+  ref: fst_dens_reflink
+parallax: 
+  name: fst_plx
+difstance: 
+  name: fst_difst
+spectral_type: 
+  name: fst_spectype
+  unit: fstr
+  ref: fst_spectype_reflink
+luminosity:
+  name: fst_lum
+  unc: [fst_lumerr1, fst_lumerr2]
+  ref: fst_lum_reflink
+age: 
+  name: fst_age
+  unc: [fst_ageerr1, fst_ageerr2]
+  ref: fst_age_reflink
+
+
+planets:
+  id: 
+    name: fpl_name
+  density: 
+    name: fpl_dens
+    unc: [fpl_denserr1, fpl_denserr2]
+    ref: fpl_dens_reflink
+  t_eff:
+    name: fpl_eqt
+    ref: fpl_eqt_reflink
+    unc: [fpl_eqterr1, fpl_eqterr2]
+  transit_depth: 
+    name: fpl_trandep
+    unc: [fpl_trandeperr1, fpl_trandeperr2]
+    ref: fpl_trandep_reflink
+  transit_duration: 
+    name: fpl_trandur
+    unc: [fpl_trandurerr1, fpl_trandurerr2]
+    ref: fpl_trandur_reflink
+  transit_epoch: 
+    name: fpl_tranmid
+    unc: [fpl_tranmiderr1, fpl_tranmiderr2]
+    ref: fpl_tranmid_reflink
+  radius: 
+    name: fpl_radj
+    unc: [fpl_radjerr1, fpl_radjerr2]
+    ref: fpl_radj_reflink
+  mass: 
+    name: fpl_bmassj
+    unc: [fpl_bmassjerr1, fpl_bmassjerr2]
+    ref: fpl_bmassj_reflink
+  semi_major_axis: 
+    name: fpl_orbsmax
+    unc: [fpl_orbsmaxerr1, fpl_orbsmaxerr2]
+    ref: fpl_orbsmax_reflink
+  inclination: 
+    name: fpl_orbincl
+    unc: [fpl_orbinclerr1, fpl_orbinclerr2]
+  eccentricity: 
+    name: fpl_orbeccen
+    unit: ''
+    unc: [fpl_orbeccenerr1, fpl_orbeccenerr2]
+    ref: fpl_orbeccen_reflink
+  period: 
+    name: fpl_orbper
+    unc: [fpl_orbpererr1, fpl_orbpererr2]
+    ref: fpl_orbper_reflink
+  argument_of_periastron: 
+    name: fpl_orblper
+    unc: [fpl_orblpererr1, fpl_orblpererr2]
+  time_of_periastron: 
+    name: fpl_orbtper
+    unc: [fpl_orbtpererr1, fpl_orbtpererr2]
+    ref: fpl_orbtper_reflink
+  radial_velocity_amplitude:
+    name: fpl_rvamp
+    unc: [fpl_rvamperr1, fpl_rvamperr2]
+    ref: fpl_rvamp_reflink
+

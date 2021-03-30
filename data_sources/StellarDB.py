@@ -10,6 +10,7 @@ import copy
 import astropy.units as u
 import astropy.coordinates as coords
 from astropy.time import Time
+from astropy.table import QTable
 
 import importlib
 
@@ -17,12 +18,14 @@ import numpy as np
 import pandas as pd
 
 # import yaml
-
+from astropy.utils.data import download_file
 from astroquery.simbad import Simbad
-from astroquery.exoplanet_orbit_database import ExoplanetOrbitDatabase
+from astroquery.exoplanet_orbit_database import ExoplanetOrbitDatabaseClass
 from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
 
 from astropy.io.misc import yaml
+
+from flex.flex import FlexFile
 
 try:
     from . import Cache, config as Config
@@ -51,6 +54,14 @@ class StellarDB:
         with open(fname, "w") as fp:
             yaml.dump(data, fp, default_flow_style=False)
 
+    def load_flex(self, fname):
+        ff = FlexFile.read(fname)
+        return self._fix(ff.header)
+
+    def write_flex(self, fname, data):
+        ff = Flexfile(header=data)
+        ff.write(fname)
+
     def load_layout(self, name):
         fname = os.path.join(os.path.dirname(__file__), f"layout_{name.lower()}.yaml")
         return self.__load_yaml__(fname)
@@ -60,7 +71,7 @@ class StellarDB:
         list_of_files = [
             os.path.join(self.folder, x)
             for x in os.listdir(self.folder)
-            if x.endswith(".yaml")
+            if x.endswith(".flex")
         ]
 
         cache = Cache.Cache(self.cache, *list_of_files)
@@ -74,9 +85,9 @@ class StellarDB:
 
         name_index = {}
         for entry in list_of_files:
-            star = self.__load_yaml__(entry)
+            star = self.load_flex(entry)
             name_list = (
-                star["name"] if isinstance(star["name"], list) else (star["name"],)
+                star["id"] if isinstance(star["id"], list) else (star["id"],)
             )
             for name in name_list:
                 name = name.replace(" ", "")
@@ -98,30 +109,34 @@ class StellarDB:
             else:
                 raise AttributeError("Name %s not found" % name)
 
-        return self.__fix__(self.__load_yaml__(self.name_index[name]))
+        filename = self.name_index[name]
+        star = self.load_flex(filename)
+
+        return star
 
     def save(self, star):
         """ save data for star with given name """
-        name = star["name"][0].replace(" ", "")
+        name = star["id"][0].replace(" ", "")
         if name not in self.name_index:
             print(f"WARNING: Name {name} not found, creating new entry")
-            filename = name + ".yaml"
+            filename = name + ".flex"
             i = 1
             while os.path.exists(os.path.join(self.folder, filename)):
-                filename = name + i + ".yaml"
+                filename = name + i + ".flex"
                 i += 1
             filename = os.path.join(self.folder, filename)
             self.name_index[name] = filename
         else:
             filename = self.name_index[name]
 
-        self.__write_yaml__(filename, star)
+        ff = FlexFile(header=star)
+        ff.write(filename)
 
-    def __fix__(self, star):
+    def _fix(self, star):
         """ fix read object, to conform to standards """
-        if isinstance(star["name"], str):
-            star["name"] = [
-                star["name"],
+        if isinstance(star["id"], str):
+            star["id"] = [
+                star["id"],
             ]
 
         return star
@@ -175,8 +190,8 @@ class StellarDB:
         try:
             star = self.load(name, auto_get=False)
         except AttributeError:
-            star = {"name": [name]}
-        name = star["name"][0]
+            star = {"id": [name]}
+        name = star["id"][0]
 
         # Load fields to read from Database
         simbad_source = StellarDB_Simbad()
@@ -328,6 +343,8 @@ class StellarDB_Simbad(StellarDB_DataSource):
                 print(f"Connection failed, attempt {i} of {self.timeout}")
                 continue
 
+        # Reset the fileds, in case we run this several times
+        Simbad.reset_votable_fields()
         if simbad_data is None:
             raise RuntimeError("Star name not found or connection timed out")
 
@@ -365,18 +382,58 @@ class StellarDB_Simbad(StellarDB_DataSource):
 
         return ids
 
-class StellarDB_ExoplanetsOrg(StellarDB_DataSource):
+class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass):
     def __init__(self):
+        super().__init__()
         self.layout = self.load_layout("exoplanets_org")
         self.citation = [("Han, E., “Exoplanet Orbit Database. II. Updates to "
             "Exoplanets.org”, Publications of the Astronomical Society of the "
             "Pacific, vol. 126, no. 943, p. 827, 2014. doi:10.1086/678447")]
+        self.EXOPLANETS_CSV_URL = 'http://exoplanets.org/csv-files/exoplanets.csv'
+
+    def get_table(self, cache=True, show_progress=True, table_path=None):
+        """ We overwrite the get table method, since the original uses a horrbly slow
+        implementation. We replace that with pandas. We also skip some minor steps that
+        we dont need. """
+        if self._table is None:
+            if table_path is None:
+                table_path = download_file(self.EXOPLANETS_CSV_URL, cache=cache,
+                                           show_progress=show_progress)
+            # Pandas go brrrr
+            exoplanets_table = pd.read_csv(table_path, low_memory=False)
+
+            # Use numpy char arrays for efficiency
+            lowercase_names = exoplanets_table["NAME"].values.astype(str)
+            lowercase_names = np.char.lower(lowercase_names)
+            lowercase_names = np.char.replace(lowercase_names, " ", "")
+            exoplanets_table['NAME_LOWERCASE'] = lowercase_names
+
+            # convert the dataframe to a quantity table
+            exoplanets_table = QTable.from_pandas(exoplanets_table)
+            # Need to define the index
+            exoplanets_table.add_index('NAME_LOWERCASE')
+
+            # Create sky coordinate mixin column
+            # Skip the sky coordinates, as we will do that later manually
+            # exoplanets_table['sky_coord'] = coords.SkyCoord(ra=exoplanets_table['RA'] * u.hourangle,
+            #                                          dec=exoplanets_table['DEC'] * u.deg)
+            # Assign units to columns where possible
+            for col in exoplanets_table.columns:
+                if col in self.param_units:
+                    # Check that unit is implemented in this version of astropy
+                    try:
+                        exoplanets_table[col].unit = u.Unit(self.param_units[col])
+                    except ValueError:
+                        print(f"WARNING: Unit {self.param_units[col]} not recognised")
+
+            self._table = QTable(exoplanets_table)
+        return self._table
 
     def get(self, name):
         planets = {}
         for comp in ascii_lowercase[1:]:
             try:
-                exoplanet_data = ExoplanetOrbitDatabase.query_planet(f"{name} {comp}")
+                exoplanet_data = self.query_planet(f"{name} {comp}")
                 exoplanet_data = self.set_values(exoplanet_data, self.layout)
                 exoplanet_data["planets"] = {comp: exoplanet_data["planets"]}
                 if comp == "b":
@@ -400,11 +457,24 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             "Technology, under contract with the National Aeronautics and "
             "Space Administration under the Exoplanet Exploration Program."]
 
+    def tap(self, name, regularize=True):
+        from astroquery.utils.tap.core import TapPlus
+
+        if regularize:
+            name = NasaExoplanetArchive._regularize_object_name(name)
+
+        archive = TapPlus(url="https://exoplanetarchive.ipac.caltech.edu/TAP")
+        query = archive.launch_job(f"select top 10 * from pscomppars where hostname='{name}'")
+        table = query.results
+
+        return table
+
     def get(self, name):
         data = None
         for i in range(self.timeout):
             try:
-                data = NasaExoplanetArchive.query_object(name)
+                # data = NasaExoplanetArchive.query_object(name)
+                data = self.tap(name)
                 break
             except Exception:
                 print(f"Connection failed, attempt {i} of {self.timeout}")

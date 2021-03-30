@@ -1,0 +1,7 @@
+numpy
+astropy
+astroquery=0.41
+pandas
+requests
+pyyaml
+flex-format
