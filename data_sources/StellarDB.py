@@ -4,9 +4,14 @@ Handle the collection of yaml files known as stellar db
 import inspect
 import os
 import sys
+from string import ascii_lowercase
+import copy
 
 import astropy.units as u
 import astropy.coordinates as coords
+from astropy.time import Time
+
+import importlib
 
 import numpy as np
 import pandas as pd
@@ -15,12 +20,17 @@ import pandas as pd
 
 from astroquery.simbad import Simbad
 from astroquery.exoplanet_orbit_database import ExoplanetOrbitDatabase
+from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
+
 from astropy.io.misc import yaml
 
-from . import Cache, config as Config
+try:
+    from . import Cache, config as Config
+except:
+    import Cache
+    import config as Config
 
 # TODO use json instead of yaml
-
 
 class StellarDB:
     """ Class for handling stellar_db """
@@ -30,11 +40,6 @@ class StellarDB:
         self.folder = config["path_stellar_db"]
         self.cache = config["path_cache"]
         self.name_index = self.gen_name_index()
-
-        config_filename = os.path.join(
-            os.path.dirname(__file__), "StellarDB_config.yaml"
-        )
-        self.config = self.__load_yaml__(config_filename)
 
     def __load_yaml__(self, fname):
         """ load yaml data from file with given filename """
@@ -133,7 +138,81 @@ class StellarDB:
         else:
             return value
 
-    def set_values(self, data, layout, **kwargs):
+    def deepupdate(self, target, src):
+        """Deep update target dict with src
+        For each k,v in src: if k doesn't exist in target, it is deep copied from
+        src to target. Otherwise, if v is a list, target[k] is extended with
+        src[k]. If v is a set, target[k] is updated with v, If v is a dict,
+        recursively deep-update it.
+
+        Examples:
+        >>> t = {'name': 'Ferry', 'hobbies': ['programming', 'sci-fi']}
+        >>> deepupdate(t, {'hobbies': ['gaming']})
+        >>> print t
+        {'name': 'Ferry', 'hobbies': ['programming', 'sci-fi', 'gaming']}
+        """
+        for k, v in src.items():
+            if type(v) == list:
+                if not k in target:
+                    target[k] = copy.deepcopy(v)
+                else:
+                    target[k].extend(v)
+            elif type(v) == dict:
+                if not k in target:
+                    target[k] = copy.deepcopy(v)
+                else:
+                    self.deepupdate(target[k], v)
+            elif type(v) == set:
+                if not k in target:
+                    target[k] = v.copy()
+                else:
+                    target[k].update(v.copy())
+            else:
+                target[k] = copy.copy(v)
+
+    def auto_fill(self, name):
+        """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
+        try:
+            star = self.load(name, auto_get=False)
+        except AttributeError:
+            star = {"name": [name]}
+        name = star["name"][0]
+
+        # TODO: rework this to be more flexible
+        # 1) Use a class? for each possible source of data
+        # and collect all available data
+        # 2) for each data value, decide which value to use
+
+        # Load fields to read from Database
+        simbad_source = StellarDB_Simbad()
+        exoplanets_org_source = StellarDB_ExoplanetsOrg()
+        exoplanets_nasa_source = StellarDB_ExoplanetsNasa()
+
+        simbad_data = simbad_source.get(name)
+        exoplanet_data = exoplanets_org_source.get(name)
+        nasa_data = exoplanets_nasa_source.get(name)
+
+        # Combine datasets
+        # TODO: decide how to do this
+        # Here we simply use an order of priority
+        # I.e. least trustworthy first
+        self.deepupdate(star, exoplanet_data)
+        self.deepupdate(star, simbad_data)
+        self.deepupdate(star, nasa_data)
+
+        self.save(star)
+
+class StellarDB_DataSource:
+    def load_yaml(self, fname):
+        """ load yaml data from file with given filename """
+        with open(fname, "r") as fp:
+            return yaml.load(fp)
+
+    def load_layout(self, name):
+        fname = os.path.join(os.path.dirname(__file__), f"layout_{name.lower()}.yaml")
+        return self.load_yaml(fname)
+
+    def set_values(self, data, layout, skip_nan=True):
         """
         Fill the fields in layout, with data from data and keywords
         
@@ -146,68 +225,117 @@ class StellarDB:
         """
 
         result = {}
-        for key in layout:
-            data_key = layout[key]
-            unit = None
-            if isinstance(data_key, list):
-                data_key, unit = data_key
-            elif isinstance(data_key, dict):
-                result[key] = self.set_values(data, data_key, **kwargs)
+
+        for key, value in layout.items():
+            if key.startswith("__"):
                 continue
+            if "name" in value:
+                unit = value.get("unit", None)
+                name = value["name"]
+                try:
+                    ref = data[value["ref"]]
+                except KeyError:
+                    ref = None
 
-            try:
-                value = data[data_key].array[0]
-            except AttributeError:
-                # Its not a pandas array
-                value = data[data_key]
-            except KeyError:
-                # Data not in data, get it from keyword args
-                value = kwargs[data_key]
+                try:
+                    unc = value["unc"]
+                    unc = (data[unc[0]], data[unc[1]])
+                except KeyError:
+                    unc = None
 
-            if np.ma.is_masked(value) or value is np.nan:
-                continue
+                try:
+                    value = data[name]
+                except KeyError:
+                    # Skip missing data
+                    continue
 
-            value = self.to_base_type(value)
+                # Extract data from structures if necessary
+                try:
+                    value = data[name].array[0]
+                except AttributeError:
+                    # Its not a pandas array
+                    pass
 
-            if unit is not None:
-                if isinstance(value, str):
-                    value = coords.Angle(value, unit)
-                elif isinstance(value, u.Quantity):
-                    value = value.to_value(u.one) * u.Unit(unit)
+                if (skip_nan and 
+                    (value is None or value != value or np.ma.is_masked(value))):
+                    # Skip bad values
+                    # value != value == nan
+                    continue
+
+                # Apply the correct units
+                if unit is None or unit == "str":
+                    pass
+                elif unit == "hourangle":
+                    value = coords.Angle(value, u.hourangle)
+                elif unit == "deg" and isinstance(value, str):
+                    value = coords.Angle(value, u.deg)
+                elif unit == "jd":
+                    value = Time(value, format=unit)
                 else:
-                    value *= u.Unit(unit)
-            result[key] = value
+                    value = value << u.Unit(unit)
+
+                # Apply Meta information
+                try:
+                    if value.info.meta is None:
+                        value.info.meta = {}
+                    if ref is not None:
+                        value.info.meta["reference"] = ref
+                    if unc is not None:
+                        value.info.meta["uncertainty"] = unc
+                except:
+                    pass
+
+                # Store data
+                result[key] = value
+
+            elif "__class__" in value:
+                # If we provide a class use that
+                # The input to the constructor are the specified values
+                module = value["__module__"]
+                cls = value["__class__"]
+                module = importlib.import_module(module)
+                module = getattr(module, cls)
+                layout2 = {k:v for k,v in layout[key].items() if k != "class"}
+                value = self.set_values(data, layout2)
+                result[key] = module(**value)
+            else:
+                result[key] = self.set_values(data, layout[key])
 
         return result
 
-    def auto_fill(self, name):
-        """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
-        try:
-            star = self.load(name, auto_get=False)
-        except AttributeError:
-            star = {"name": [name]}
-        name = star["name"][0]
 
-        # Load fields to read from Database
-        simbad_fields = self.config["SIMBAD_fields"]
-        exoplanet_fields = self.config["exoplanet_fields"]
+class StellarDB_Simbad(StellarDB_DataSource):
+    def __init__(self):
+        self.fields = ["ra","dec", "diameter", "rv_value", "fe_h", "rot", 
+        "pmra", "pmdec", "plx", "sp", "otype", "flux(U)", "flux(B)", "flux(V)",
+         "flux(G)", "flux(R)", "flux(I)", "flux(J)", "flux(H)", "flux(K)"]
+        self.timeout = 10
+        self.layout = self.load_layout("simbad")
+        self.citation = [("Wenger, M., “The SIMBAD astronomical database. The " 
+            "CDS reference database for astronomical objects”, Astronomy and "
+            "Astrophysics Supplement Series, vol. 143, pp. 9–22, 2000. "
+            "doi:10.1051/aas:2000332")]
 
+    def get(self, name):
         # SIMBAD Data
-        for f in simbad_fields:
+        for f in self.fields:
             try:
                 Simbad.add_votable_fields(f)
             except KeyError:
                 print("No field named ", f, " found")
 
-        for _ in range(10):
+        simbad_data = None
+        for i in range(self.timeout):
             try:
                 simbad_data = Simbad.query_object(name)
                 break
             except Exception:
+                print(f"Connection failed, attempt {i} of {self.timeout}")
                 continue
 
         if simbad_data is None:
-            raise AttributeError("Star name not found")
+            raise RuntimeError("Star name not found or connection timed out")
+
         simbad_data = simbad_data.to_pandas()
         simbad_data = simbad_data.applymap(
             lambda s: s.decode("utf-8") if isinstance(s, bytes) else s
@@ -215,45 +343,96 @@ class StellarDB:
         simbad_data["MAIN_ID"] = simbad_data["MAIN_ID"].apply(
             lambda s: s.replace(" ", "")
         )
+        simbad_data = dict(simbad_data)
+        simbad_data = self.set_values(simbad_data, self.layout)
+        simbad_data["id"] = self.get_ids(name)
+        simbad_data["citation"] = self.citation
+        return simbad_data
 
+    def get_ids(self, name):
         # Give it a few tries, just in case
-        for _ in range(10):
+        ids = None
+        for i in range(self.timeout):
             try:
                 ids = Simbad.query_objectids(name)
                 break
             except Exception:
+                print(f"Connection failed, attempt {i}")
                 continue
+        if ids is None:
+            raise RuntimeError("Star name not found or connection timed out")
+
         # To keep the order of elements
+        star = {"name": [name]}
         ids = list(ids["ID"])
         ids, ind = np.unique(star["name"] + ids, return_index=True)
         ids = list(ids[np.argsort(ind)])
 
-        simbad_data = dict(simbad_data)
-        layout = self.load_layout("simbad")
-        data = self.set_values(simbad_data, layout, ids=ids)
+        return ids
 
-        # Exoplanet Data
+class StellarDB_ExoplanetsOrg(StellarDB_DataSource):
+    def __init__(self):
+        self.layout = self.load_layout("exoplanets_org")
+        self.citation = [("Han, E., “Exoplanet Orbit Database. II. Updates to "
+            "Exoplanets.org”, Publications of the Astronomical Society of the "
+            "Pacific, vol. 126, no. 943, p. 827, 2014. doi:10.1086/678447")]
+
+    def get(self, name):
         planets = {}
-        layout = self.load_layout("exoplanets")
-        for comp in ["b", "c", "d", "e", "f", "g"]:
+        for comp in ascii_lowercase[1:]:
             try:
                 exoplanet_data = ExoplanetOrbitDatabase.query_planet(f"{name} {comp}")
-                exoplanet_data = self.set_values(exoplanet_data, layout)
+                exoplanet_data = self.set_values(exoplanet_data, self.layout)
                 exoplanet_data["planets"] = {comp: exoplanet_data["planets"]}
-                planets[comp] = exoplanet_data
+                if comp == "b":
+                    planets = exoplanet_data
+                else:
+                    planets["planets"][comp] = exoplanet_data["planets"][comp]
             except KeyError:
                 # Planet not found (and we don't expect any more)
                 break
 
-        # Combine datasets
-        star.update(data)
-        for p in planets.values():
-            star.update(p)
+        planets["citation"] = self.citation
+        return planets
+           
 
-        star["citation"] = "SIMBAD, Exoplanets.org"
+class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
+    def __init__(self):
+        self.timeout = 10
+        self.layout = self.load_layout("exoplanets_nasa")
+        self.citation = ["This research has made use of the NASA Exoplanet "
+            "Archive, which is operated by the California Institute of "
+            "Technology, under contract with the National Aeronautics and "
+            "Space Administration under the Exoplanet Exploration Program."]
 
-        self.save(star)
+    def get(self, name):
+        data = None
+        for i in range(self.timeout):
+            try:
+                data = NasaExoplanetArchive.query_object(name)
+                break
+            except Exception:
+                print(f"Connection failed, attempt {i} of {self.timeout}")
+                continue
+        
+        if data is None:
+            raise RuntimeError("Star name not found or connection timed out")
 
+        if len(data) == 0:
+            # No data found in the datatbase
+            return {}
+
+        star_data = self.set_values(data[0], self.layout)
+        star_data["planets"] = {data[0]["pl_letter"] : star_data["planets"]}
+
+        for i in range(1, len(data)):
+            planet_letter = data[i]["pl_letter"]
+            planet_data = self.set_values(data[i], self.layout)
+            star_data["planets"][planet_letter] = planet_data["planets"]
+
+        star_data["citation"] = self.citation
+
+        return star_data
 
 if __name__ == "__main__":
     target = "Trappist-1"
