@@ -178,11 +178,6 @@ class StellarDB:
             star = {"name": [name]}
         name = star["name"][0]
 
-        # TODO: rework this to be more flexible
-        # 1) Use a class? for each possible source of data
-        # and collect all available data
-        # 2) for each data value, decide which value to use
-
         # Load fields to read from Database
         simbad_source = StellarDB_Simbad()
         exoplanets_org_source = StellarDB_ExoplanetsOrg()
