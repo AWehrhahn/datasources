@@ -210,6 +210,13 @@ class StellarDB:
         self.deepupdate(star, simbad_data)
         self.deepupdate(star, nasa_data)
 
+        # Remove duplicate entries
+        # Remove extra spaces
+        ids = [" ".join(s.split()) for s in star["id"]]
+        ids, ind = np.unique(ids, return_index=True)
+        star["id"] = ids[np.argsort(ind)]
+        star["citation"] = np.unique(star["citation"])
+
         self.save(star)
 
 class StellarDB_DataSource:
