@@ -153,6 +153,7 @@ class StellarDB:
         else:
             return value
 
+    # Copyright Ferry Boender, released under the MIT license.
     def deepupdate(self, target, src):
         """Deep update target dict with src
         For each k,v in src: if k doesn't exist in target, it is deep copied from
