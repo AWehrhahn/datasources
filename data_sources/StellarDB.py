@@ -35,6 +35,7 @@ except:
 
 # TODO use json instead of yaml
 
+
 class StellarDB:
     """ Class for handling stellar_db """
 
@@ -86,9 +87,7 @@ class StellarDB:
         name_index = {}
         for entry in list_of_files:
             star = self.load_flex(entry)
-            name_list = (
-                star["id"] if isinstance(star["id"], list) else (star["id"],)
-            )
+            name_list = star["id"] if isinstance(star["id"], list) else (star["id"],)
             for name in name_list:
                 name = name.replace(" ", "")
                 name_index[name] = entry
@@ -220,6 +219,7 @@ class StellarDB:
 
         self.save(star)
 
+
 class StellarDB_DataSource:
     def load_yaml(self, fname):
         """ load yaml data from file with given filename """
@@ -274,8 +274,12 @@ class StellarDB_DataSource:
                     # Its not a pandas array
                     pass
 
-                if (skip_nan and 
-                    (value is None or value != value or np.ma.is_masked(value))):
+                if isinstance(value, bytes):
+                    value = value.decode()
+
+                if skip_nan and (
+                    value is None or value != value or np.ma.is_masked(value)
+                ):
                     # Skip bad values
                     # value != value == nan
                     continue
@@ -313,7 +317,7 @@ class StellarDB_DataSource:
                 cls = value["__class__"]
                 module = importlib.import_module(module)
                 module = getattr(module, cls)
-                layout2 = {k:v for k,v in layout[key].items() if k != "class"}
+                layout2 = {k: v for k, v in layout[key].items() if k != "class"}
                 value = self.set_values(data, layout2)
                 result[key] = module(**value)
             else:
@@ -324,15 +328,38 @@ class StellarDB_DataSource:
 
 class StellarDB_Simbad(StellarDB_DataSource):
     def __init__(self):
-        self.fields = ["ra","dec", "diameter", "rv_value", "fe_h", "rot", 
-        "pmra", "pmdec", "plx", "sp", "otype", "flux(U)", "flux(B)", "flux(V)",
-         "flux(G)", "flux(R)", "flux(I)", "flux(J)", "flux(H)", "flux(K)"]
+        self.fields = [
+            "ra",
+            "dec",
+            "diameter",
+            "rv_value",
+            "fe_h",
+            "rot",
+            "pmra",
+            "pmdec",
+            "plx",
+            "sp",
+            "otype",
+            "flux(U)",
+            "flux(B)",
+            "flux(V)",
+            "flux(G)",
+            "flux(R)",
+            "flux(I)",
+            "flux(J)",
+            "flux(H)",
+            "flux(K)",
+        ]
         self.timeout = 10
         self.layout = self.load_layout("simbad")
-        self.citation = [("Wenger, M., “The SIMBAD astronomical database. The " 
-            "CDS reference database for astronomical objects”, Astronomy and "
-            "Astrophysics Supplement Series, vol. 143, pp. 9–22, 2000. "
-            "doi:10.1051/aas:2000332")]
+        self.citation = [
+            (
+                "Wenger, M., “The SIMBAD astronomical database. The "
+                "CDS reference database for astronomical objects”, Astronomy and "
+                "Astrophysics Supplement Series, vol. 143, pp. 9–22, 2000. "
+                "doi:10.1051/aas:2000332"
+            )
+        ]
 
     def get(self, name):
         # SIMBAD Data
@@ -390,14 +417,19 @@ class StellarDB_Simbad(StellarDB_DataSource):
 
         return ids
 
+
 class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass):
     def __init__(self):
         super().__init__()
         self.layout = self.load_layout("exoplanets_org")
-        self.citation = [("Han, E., “Exoplanet Orbit Database. II. Updates to "
-            "Exoplanets.org”, Publications of the Astronomical Society of the "
-            "Pacific, vol. 126, no. 943, p. 827, 2014. doi:10.1086/678447")]
-        self.EXOPLANETS_CSV_URL = 'http://exoplanets.org/csv-files/exoplanets.csv'
+        self.citation = [
+            (
+                "Han, E., “Exoplanet Orbit Database. II. Updates to "
+                "Exoplanets.org”, Publications of the Astronomical Society of the "
+                "Pacific, vol. 126, no. 943, p. 827, 2014. doi:10.1086/678447"
+            )
+        ]
+        self.EXOPLANETS_CSV_URL = "http://exoplanets.org/csv-files/exoplanets.csv"
 
     def get_table(self, cache=True, show_progress=True, table_path=None):
         """ We overwrite the get table method, since the original uses a horrbly slow
@@ -405,8 +437,9 @@ class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass)
         we dont need. """
         if self._table is None:
             if table_path is None:
-                table_path = download_file(self.EXOPLANETS_CSV_URL, cache=cache,
-                                           show_progress=show_progress)
+                table_path = download_file(
+                    self.EXOPLANETS_CSV_URL, cache=cache, show_progress=show_progress
+                )
             # Pandas go brrrr
             exoplanets_table = pd.read_csv(table_path, low_memory=False)
 
@@ -414,12 +447,12 @@ class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass)
             lowercase_names = exoplanets_table["NAME"].values.astype(str)
             lowercase_names = np.char.lower(lowercase_names)
             lowercase_names = np.char.replace(lowercase_names, " ", "")
-            exoplanets_table['NAME_LOWERCASE'] = lowercase_names
+            exoplanets_table["NAME_LOWERCASE"] = lowercase_names
 
             # convert the dataframe to a quantity table
             exoplanets_table = QTable.from_pandas(exoplanets_table)
             # Need to define the index
-            exoplanets_table.add_index('NAME_LOWERCASE')
+            exoplanets_table.add_index("NAME_LOWERCASE")
 
             # Create sky coordinate mixin column
             # Skip the sky coordinates, as we will do that later manually
@@ -454,16 +487,18 @@ class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass)
 
         planets["citation"] = self.citation
         return planets
-           
+
 
 class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
     def __init__(self):
         self.timeout = 10
         self.layout = self.load_layout("exoplanets_nasa")
-        self.citation = ["This research has made use of the NASA Exoplanet "
+        self.citation = [
+            "This research has made use of the NASA Exoplanet "
             "Archive, which is operated by the California Institute of "
             "Technology, under contract with the National Aeronautics and "
-            "Space Administration under the Exoplanet Exploration Program."]
+            "Space Administration under the Exoplanet Exploration Program."
+        ]
 
     def tap(self, name, regularize=True):
         from astroquery.utils.tap.core import TapPlus
@@ -472,7 +507,9 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             name = NasaExoplanetArchive._regularize_object_name(name)
 
         archive = TapPlus(url="https://exoplanetarchive.ipac.caltech.edu/TAP")
-        query = archive.launch_job(f"select top 10 * from pscomppars where hostname='{name}'")
+        query = archive.launch_job(
+            f"select top 10 * from pscomppars where hostname='{name}'"
+        )
         table = query.results
 
         return table
@@ -487,7 +524,7 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             except Exception:
                 print(f"Connection failed, attempt {i} of {self.timeout}")
                 continue
-        
+
         if data is None:
             raise RuntimeError("Star name not found or connection timed out")
 
@@ -496,7 +533,10 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             return {}
 
         star_data = self.set_values(data[0], self.layout)
-        star_data["planets"] = {data[0]["pl_letter"] : star_data["planets"]}
+        letter = data[0]["pl_letter"]
+        if isinstance(letter, bytes):
+            letter = letter.decode()
+        star_data["planets"] = {letter: star_data["planets"]}
 
         for i in range(1, len(data)):
             planet_letter = data[i]["pl_letter"]
@@ -506,6 +546,7 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
         star_data["citation"] = self.citation
 
         return star_data
+
 
 if __name__ == "__main__":
     target = "Trappist-1"
