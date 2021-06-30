@@ -35,7 +35,7 @@ logg:
   unc: [st_loggerr1, st_loggerr2]
   unit: ''
 velocity_rotation: 
-  name: st_vsini
+  name: st_vsin
   unc: [st_vsinerr1, st_vsinerr2]
   ref: st_vsin_reflink
   unit: km / s 
