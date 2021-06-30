@@ -504,6 +504,7 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
         from astroquery.utils.tap.core import TapPlus
 
         if regularize:
+            name = name.replace("_", " ")
             name = NasaExoplanetArchive._regularize_object_name(name)
 
         archive = TapPlus(url="https://exoplanetarchive.ipac.caltech.edu/TAP")
@@ -540,6 +541,8 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
 
         for i in range(1, len(data)):
             planet_letter = data[i]["pl_letter"]
+            if isinstance(planet_letter, bytes):
+                planet_letter = planet_letter.decode()
             planet_data = self.set_values(data[i], self.layout)
             star_data["planets"][planet_letter] = planet_data["planets"]
 
