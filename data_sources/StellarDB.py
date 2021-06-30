@@ -39,11 +39,14 @@ except:
 class StellarDB:
     """ Class for handling stellar_db """
 
-    def __init__(self):
+    def __init__(self, sources=None):
         config = Config.load_config()
         self.folder = config["path_stellar_db"]
         self.cache = config["path_cache"]
         self.name_index = self.gen_name_index()
+        if sources is None:
+            sources = ["exoplanets_org", "simbad", "exoplanets_nasa"]
+        self.sources = sources
 
     def __load_yaml__(self, fname):
         """ load yaml data from file with given filename """
@@ -194,21 +197,26 @@ class StellarDB:
         name = star["id"][0]
 
         # Load fields to read from Database
-        simbad_source = StellarDB_Simbad()
-        exoplanets_org_source = StellarDB_ExoplanetsOrg()
-        exoplanets_nasa_source = StellarDB_ExoplanetsNasa()
+        sources = {}
+        if "simbad" in self.sources:
+            sources["simbad"] = StellarDB_Simbad()
+        if "exoplanets_org" in self.sources:
+            sources["exoplanets_org"] = StellarDB_ExoplanetsOrg()
+        if "exoplanets_nasa" in self.sources:
+            sources["exoplanets_nasa"] = StellarDB_ExoplanetsNasa()
 
-        simbad_data = simbad_source.get(name)
-        exoplanet_data = exoplanets_org_source.get(name)
-        nasa_data = exoplanets_nasa_source.get(name)
+        data = {}
+        for id, source in sources.items():
+            data[id] = source.get(name)
+            self.deepupdate(star, data[id])
 
         # Combine datasets
         # TODO: decide how to do this
         # Here we simply use an order of priority
         # I.e. least trustworthy first
-        self.deepupdate(star, exoplanet_data)
-        self.deepupdate(star, simbad_data)
-        self.deepupdate(star, nasa_data)
+        # self.deepupdate(star, exoplanet_data)
+        # self.deepupdate(star, simbad_data)
+        # self.deepupdate(star, nasa_data)
 
         # Remove duplicate entries
         # Remove extra spaces
