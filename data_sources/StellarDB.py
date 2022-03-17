@@ -1,6 +1,7 @@
 """
 Handle the collection of yaml files known as stellar db
 """
+import imp
 import inspect
 import os
 import sys
@@ -21,7 +22,7 @@ import pandas as pd
 from astropy.utils.data import download_file
 from astroquery.simbad import Simbad
 from astroquery.exoplanet_orbit_database import ExoplanetOrbitDatabaseClass
-from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
+from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
 
 from astropy.io.misc import yaml
 
@@ -37,7 +38,7 @@ except:
 
 
 class StellarDB:
-    """ Class for handling stellar_db """
+    """Class for handling stellar_db"""
 
     def __init__(self, sources=None):
         config = Config.load_config()
@@ -49,12 +50,12 @@ class StellarDB:
         self.sources = sources
 
     def __load_yaml__(self, fname):
-        """ load yaml data from file with given filename """
+        """load yaml data from file with given filename"""
         with open(fname, "r") as fp:
             return yaml.load(fp)
 
     def __write_yaml__(self, fname, data):
-        """ write data to disk """
+        """write data to disk"""
         with open(fname, "w") as fp:
             yaml.dump(data, fp, default_flow_style=False)
 
@@ -71,7 +72,7 @@ class StellarDB:
         return self.__load_yaml__(fname)
 
     def gen_name_index(self):
-        """ index all names to files containing them """
+        """index all names to files containing them"""
         list_of_files = [
             os.path.join(self.folder, x)
             for x in os.listdir(self.folder)
@@ -117,7 +118,7 @@ class StellarDB:
         return star
 
     def save(self, star):
-        """ save data for star with given name """
+        """save data for star with given name"""
         name = star["id"][0].replace(" ", "")
         if name not in self.name_index:
             print(f"WARNING: Name {name} not found, creating new entry")
@@ -135,7 +136,7 @@ class StellarDB:
         ff.write(filename)
 
     def _fix(self, star):
-        """ fix read object, to conform to standards """
+        """fix read object, to conform to standards"""
         if isinstance(star["id"], str):
             star["id"] = [
                 star["id"],
@@ -189,7 +190,7 @@ class StellarDB:
                 target[k] = copy.copy(v)
 
     def auto_fill(self, name):
-        """ retrieve data from SIMBAD and ExoplanetDB and save it in file """
+        """retrieve data from SIMBAD and ExoplanetDB and save it in file"""
         try:
             star = self.load(name, auto_get=False)
         except AttributeError:
@@ -230,7 +231,7 @@ class StellarDB:
 
 class StellarDB_DataSource:
     def load_yaml(self, fname):
-        """ load yaml data from file with given filename """
+        """load yaml data from file with given filename"""
         with open(fname, "r") as fp:
             return yaml.load(fp)
 
@@ -241,7 +242,7 @@ class StellarDB_DataSource:
     def set_values(self, data, layout, skip_nan=True):
         """
         Fill the fields in layout, with data from data and keywords
-        
+
         Parameters
         ----------
         data : dict
@@ -440,9 +441,9 @@ class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass)
         self.EXOPLANETS_CSV_URL = "http://exoplanets.org/csv-files/exoplanets.csv"
 
     def get_table(self, cache=True, show_progress=True, table_path=None):
-        """ We overwrite the get table method, since the original uses a horrbly slow
+        """We overwrite the get table method, since the original uses a horrbly slow
         implementation. We replace that with pandas. We also skip some minor steps that
-        we dont need. """
+        we dont need."""
         if self._table is None:
             if table_path is None:
                 table_path = download_file(
@@ -508,26 +509,16 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             "Space Administration under the Exoplanet Exploration Program."
         ]
 
-    def tap(self, name, regularize=True):
-        from astroquery.utils.tap.core import TapPlus
-
-        if regularize:
-            name = name.replace("_", " ")
-            name = NasaExoplanetArchive._regularize_object_name(name)
-
-        archive = TapPlus(url="https://exoplanetarchive.ipac.caltech.edu/TAP")
-        query = archive.launch_job(
-            f"select top 10 * from pscomppars where hostname='{name}'"
-        )
-        table = query.results
-
-        return table
+    def tap(
+        self, name, regularize=True, table="pscomppars"
+    ):
+        query = NasaExoplanetArchive.query_object(name, regularize=regularize, table=table)
+        return query
 
     def get(self, name):
         data = None
         for i in range(self.timeout):
             try:
-                # data = NasaExoplanetArchive.query_object(name)
                 data = self.tap(name)
                 break
             except Exception:
