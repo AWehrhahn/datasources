@@ -40,7 +40,7 @@ except:
 class StellarDB:
     """Class for handling stellar_db"""
 
-    def __init__(self, sources=None):
+    def __init__(self, sources=None, regularize=True):
         config = Config.load_config()
         self.folder = config["path_stellar_db"]
         self.cache = config["path_cache"]
@@ -48,6 +48,7 @@ class StellarDB:
         if sources is None:
             sources = ["exoplanets_org", "simbad", "exoplanets_nasa"]
         self.sources = sources
+        self.regularize = regularize
 
     def __load_yaml__(self, fname):
         """load yaml data from file with given filename"""
@@ -195,7 +196,7 @@ class StellarDB:
             star = self.load(name, auto_get=False)
         except AttributeError:
             star = {"id": [name]}
-        name = star["id"][0]
+        # name = star["id"][0]
 
         # Load fields to read from Database
         sources = {}
@@ -204,7 +205,7 @@ class StellarDB:
         if "exoplanets_org" in self.sources:
             sources["exoplanets_org"] = StellarDB_ExoplanetsOrg()
         if "exoplanets_nasa" in self.sources:
-            sources["exoplanets_nasa"] = StellarDB_ExoplanetsNasa()
+            sources["exoplanets_nasa"] = StellarDB_ExoplanetsNasa(regularize=self.regularize)
 
         data = {}
         for id, source in sources.items():
@@ -277,11 +278,12 @@ class StellarDB_DataSource:
                     continue
 
                 # Extract data from structures if necessary
-                try:
-                    value = data[name].array[0]
-                except AttributeError:
-                    # Its not a pandas array
-                    pass
+                if hasattr(value, "array"):
+                    # Pandas array
+                    value = value.array[0]
+                elif hasattr(value, "unmasked"):
+                    # Astropy Masked Quantity
+                    value = value.unmasked
 
                 if isinstance(value, bytes):
                     value = value.decode()
@@ -499,7 +501,7 @@ class StellarDB_ExoplanetsOrg(StellarDB_DataSource, ExoplanetOrbitDatabaseClass)
 
 
 class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
-    def __init__(self):
+    def __init__(self, regularize=True):
         self.timeout = 10
         self.layout = self.load_layout("exoplanets_nasa")
         self.citation = [
@@ -508,6 +510,7 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
             "Technology, under contract with the National Aeronautics and "
             "Space Administration under the Exoplanet Exploration Program."
         ]
+        self.regularize=regularize
 
     def tap(
         self, name, regularize=True, table="pscomppars"
@@ -519,7 +522,7 @@ class StellarDB_ExoplanetsNasa(StellarDB_DataSource):
         data = None
         for i in range(self.timeout):
             try:
-                data = self.tap(name)
+                data = self.tap(name, regularize=self.regularize)
                 break
             except Exception:
                 print(f"Connection failed, attempt {i} of {self.timeout}")
